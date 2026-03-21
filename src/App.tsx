@@ -6,7 +6,16 @@ import { RenditionList } from './components/RenditionList';
 import { AudioTrackList } from './components/AudioTrackList';
 import { CaptionTrackList } from './components/CaptionTrackList';
 import { CollapsiblePanel } from './components/CollapsiblePanel';
+import { ManifestIssues } from './components/ManifestIssues';
+import { SegmentAnalysis } from './components/SegmentAnalysis';
+import { SegmentList } from './components/SegmentList';
+import { EncryptionDetails } from './components/EncryptionDetails';
+import { DateRangeList } from './components/DateRangeList';
+import { LowLatencyPanel } from './components/LowLatencyPanel';
+import { IFrameList } from './components/IFrameList';
+import { SubManifests } from './components/SubManifests';
 import { parseManifest } from './lib/parseManifest';
+import { validateManifest } from './lib/validateManifest';
 import type { ParsedManifest, RuntimeTrack } from './lib/types';
 
 function App() {
@@ -164,6 +173,7 @@ function App() {
         if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
         const text = await res.text();
         const parsed = parseManifest(text, inputUrl);
+        parsed.issues = validateManifest(parsed);
         setManifest(parsed);
         setMasterUrl(inputUrl);
         setActiveUrl(inputUrl);
@@ -221,13 +231,9 @@ function App() {
   }, []);
 
   const streamType = manifest
-    ? manifest.endList
-      ? manifest.playlistType === 'EVENT'
-        ? 'EVENT'
-        : 'VOD'
-      : manifest.isMaster
-        ? undefined
-        : 'LIVE'
+    ? manifest.liveStream?.isLive
+      ? manifest.liveStream.isEvent ? 'EVENT' : manifest.liveStream.isDVR ? 'LIVE DVR' : 'LIVE'
+      : manifest.endList ? 'VOD' : manifest.isMaster ? undefined : undefined
     : undefined;
 
   const audioTrackCount =
@@ -276,6 +282,12 @@ function App() {
           </div>
 
           <div className="app__details-col">
+            {manifest.issues.length > 0 && (
+              <CollapsiblePanel title="Issues" count={manifest.issues.length}>
+                <ManifestIssues issues={manifest.issues} />
+              </CollapsiblePanel>
+            )}
+
             <CollapsiblePanel title="Summary">
               <div className="summary-grid">
                 <SummaryItem label="Type" value={manifest.isMaster ? 'Master' : 'Media'} />
@@ -284,7 +296,7 @@ function App() {
                   <div className="summary-item">
                     <span className="summary-item__label">Stream</span>
                     <span className="summary-item__value">
-                      <span className={`badge badge--${streamType.toLowerCase()}`}>
+                      <span className={`badge badge--${streamType === 'VOD' ? 'vod' : streamType === 'EVENT' ? 'event' : 'live'}`}>
                         {streamType}
                       </span>
                     </span>
@@ -296,59 +308,77 @@ function App() {
                 )}
 
                 {manifest.targetDuration != null && (
-                  <SummaryItem
-                    label="Target Duration"
-                    value={`${manifest.targetDuration}s`}
-                  />
+                  <SummaryItem label="Target Duration" value={`${manifest.targetDuration}s`} />
                 )}
 
-                {manifest.totalDuration != null && manifest.totalDuration > 0 && (
+                {manifest.segmentAnalysis && (
                   <SummaryItem
                     label="Total Duration"
-                    value={formatDuration(manifest.totalDuration)}
+                    value={formatDuration(manifest.segmentAnalysis.totalDuration)}
                   />
                 )}
 
-                {manifest.segmentCount != null && (
-                  <SummaryItem
-                    label="Segments"
-                    value={String(manifest.segmentCount)}
-                  />
+                {manifest.segments.length > 0 && (
+                  <SummaryItem label="Segments" value={String(manifest.segments.length)} />
                 )}
 
                 {manifest.isMaster && (
-                  <SummaryItem
-                    label="Variants"
-                    value={String(manifest.variants.length)}
-                  />
+                  <SummaryItem label="Variants" value={String(manifest.variants.length)} />
                 )}
 
-                {manifest.isEncrypted && (
+                {manifest.encryption.isEncrypted && (
                   <div className="summary-item">
                     <span className="summary-item__label">Encryption</span>
                     <span className="summary-item__value">
                       <span className="badge badge--encrypted">
-                        {manifest.encryptionMethod || 'Yes'}
+                        {manifest.encryption.method || 'Yes'}
                       </span>
                     </span>
                   </div>
                 )}
 
                 {(manifest.discontinuityCount ?? 0) > 0 && (
+                  <SummaryItem label="Discontinuities" value={String(manifest.discontinuityCount)} />
+                )}
+
+                {manifest.discontinuitySequence != null && manifest.discontinuitySequence > 0 && (
+                  <SummaryItem label="Disc. Sequence" value={String(manifest.discontinuitySequence)} />
+                )}
+
+                {manifest.independentSegments && (
+                  <div className="summary-item">
+                    <span className="summary-item__label">Independent Segments</span>
+                    <span className="summary-item__value">
+                      <span className="badge badge--vod">Yes</span>
+                    </span>
+                  </div>
+                )}
+
+                {manifest.start && (
                   <SummaryItem
-                    label="Discontinuities"
-                    value={String(manifest.discontinuityCount)}
+                    label="Start Offset"
+                    value={`${manifest.start.timeOffset}s${manifest.start.precise ? ' (precise)' : ''}`}
                   />
                 )}
 
-                {manifest.mediaSequence != null && (
-                  <SummaryItem
-                    label="Media Sequence"
-                    value={String(manifest.mediaSequence)}
-                  />
+                {manifest.mediaSequence != null && manifest.mediaSequence > 0 && (
+                  <SummaryItem label="Media Sequence" value={String(manifest.mediaSequence)} />
                 )}
               </div>
             </CollapsiblePanel>
+
+            {manifest.segmentAnalysis && (
+              <CollapsiblePanel
+                title="Segment Analysis"
+                count={manifest.segments.length}
+              >
+                <SegmentAnalysis
+                  analysis={manifest.segmentAnalysis}
+                  targetDuration={manifest.targetDuration}
+                  liveStream={manifest.liveStream}
+                />
+              </CollapsiblePanel>
+            )}
 
             <CollapsiblePanel
               title="Audio Tracks"
@@ -376,6 +406,53 @@ function App() {
                 hasPlayer={!!activeUrl}
               />
             </CollapsiblePanel>
+
+            {manifest.encryption.isEncrypted && (
+              <CollapsiblePanel title="Encryption Details">
+                <EncryptionDetails encryption={manifest.encryption} />
+              </CollapsiblePanel>
+            )}
+
+            {manifest.dateRanges.length > 0 && (
+              <CollapsiblePanel title="Date Ranges" count={manifest.dateRanges.length}>
+                <DateRangeList dateRanges={manifest.dateRanges} />
+              </CollapsiblePanel>
+            )}
+
+            {manifest.lowLatency.hasLowLatency && (
+              <CollapsiblePanel title="Low-Latency HLS">
+                <LowLatencyPanel info={manifest.lowLatency} />
+              </CollapsiblePanel>
+            )}
+
+            {manifest.iFramePlaylists.length > 0 && (
+              <CollapsiblePanel title="I-Frame Playlists" count={manifest.iFramePlaylists.length}>
+                <IFrameList playlists={manifest.iFramePlaylists} />
+              </CollapsiblePanel>
+            )}
+
+            {manifest.segments.length > 0 && (
+              <CollapsiblePanel
+                title="Segment List"
+                count={manifest.segments.length}
+                defaultOpen={false}
+              >
+                <SegmentList
+                  segments={manifest.segments}
+                  targetDuration={manifest.targetDuration}
+                />
+              </CollapsiblePanel>
+            )}
+
+            {manifest.isMaster && (
+              <CollapsiblePanel title="Sub-Manifests" count={manifest.variants.length} defaultOpen={false}>
+                <SubManifests
+                  variants={manifest.variants}
+                  audioGroups={manifest.audioGroups}
+                  subtitleGroups={manifest.subtitleGroups}
+                />
+              </CollapsiblePanel>
+            )}
 
             <CollapsiblePanel title="Raw Manifest" defaultOpen={false}>
               <div className="raw-manifest">

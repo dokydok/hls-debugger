@@ -50,8 +50,12 @@ export function RenditionList({
         const details = [
           v.codecs,
           v.frameRate ? `${v.frameRate}fps` : null,
+          v.averageBandwidth ? `avg: ${formatBandwidth(v.averageBandwidth)}` : null,
           v.audioGroup ? `audio: ${v.audioGroup}` : null,
           v.videoRange,
+          v.hdcpLevel ? `HDCP: ${v.hdcpLevel}` : null,
+          v.name ? `"${v.name}"` : null,
+          v.programId != null ? `PID: ${v.programId}` : null,
         ]
           .filter(Boolean)
           .join(' \u00b7 ');
