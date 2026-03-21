@@ -1,0 +1,38 @@
+---
+description: HLS Stream Debugger project architecture and conventions
+alwaysApply: true
+---
+
+# HLS Stream Debugger
+
+Single-page React app that parses and plays HLS streams in the browser. Deployed as a static site on Vercel.
+
+## Stack
+
+- Vite 8 + React 19 + TypeScript (strict)
+- `hls.js` for MSE playback (Chrome, Firefox, Edge, Android)
+- Native `<video>` HLS for Safari / iOS
+- `m3u8-parser` for manifest parsing
+- No backend — all fetching happens client-side
+
+## File layout
+
+- `src/lib/types.ts` — shared TypeScript interfaces (`ParsedManifest`, `Variant`, `MediaTrack`, `RuntimeTrack`)
+- `src/lib/parseManifest.ts` — wraps `m3u8-parser`, returns typed `ParsedManifest`
+- `src/lib/resolveUrl.ts` — resolves relative playlist URIs against base URL
+- `src/components/` — one file per UI panel (UrlForm, VideoPanel, RenditionList, AudioTrackList, CaptionTrackList, CollapsiblePanel)
+- `src/App.tsx` — all state, HLS lifecycle, and layout live here
+- `src/index.css` — single global stylesheet using CSS custom properties
+
+## Key patterns
+
+- **Dual playback path**: `Hls.isSupported()` → hls.js; else `video.canPlayType('application/vnd.apple.mpegurl')` → native. Always check `isNativeRef` before calling hls.js APIs.
+- **Rendition switching**: loads the variant's media playlist URL directly (destroys and recreates the player).
+- **Track switching**: `hls.audioTrack` / `hls.subtitleTrack` on MSE; `video.audioTracks` / `video.textTracks` on native Safari.
+- **CORS**: stream servers must send `Access-Control-Allow-Origin`. Surface a clear error message when fetch fails with TypeError.
+
+## Deployment
+
+- `vercel.json` rewrites all routes to `index.html`
+- Build: `npm run build` → `dist/`
+- Node 22 (pinned in `.nvmrc`)

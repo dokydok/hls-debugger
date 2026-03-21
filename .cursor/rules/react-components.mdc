@@ -1,0 +1,47 @@
+---
+description: React component conventions for the HLS debugger UI
+globs: src/components/**/*.tsx
+alwaysApply: false
+---
+
+# React component conventions
+
+## Structure
+
+- Functional components only, exported as named exports.
+- Use `forwardRef` when the component exposes a DOM element (see `VideoPanel`).
+- Define `Props` interface inline above the component, not in a shared file.
+- Name callback props `onVerb` (e.g. `onSwitch`, `onPlayVariant`, `onSubmit`).
+
+## CollapsiblePanel wrapper
+
+Every detail section in the right column is wrapped in `CollapsiblePanel`:
+
+```tsx
+<CollapsiblePanel title="Section Name" count={items.length}>
+  <MyComponent ... />
+</CollapsiblePanel>
+```
+
+Pass `defaultOpen={false}` for sections that should start collapsed (e.g. Raw Manifest).
+
+## Track-list component pattern
+
+Components that show HLS track data follow a two-section layout:
+
+1. **Runtime controls** — shown when `hasPlayer && runtimeTracks.length > 0`. Use `<button className="track-item">` for interactive items.
+2. **Manifest info** — shown when manifest groups exist. Use `<div className="track-item track-item--info">` for non-interactive display.
+
+Props always include: `manifestGroups`, `runtimeTracks`, `currentTrack`, `onSwitch`, `hasPlayer`.
+
+When neither section has data, return a `<p className="notice">` with a short message.
+
+## Badges
+
+Use `.badge` with a color modifier for metadata pills:
+
+- `badge--live` (red) — playing / live
+- `badge--vod` (green) — VOD / auto
+- `badge--event` (amber) — event / forced
+- `badge--default` (blue) — default / active
+- `badge--encrypted` (amber) — encryption

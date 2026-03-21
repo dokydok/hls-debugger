@@ -1,0 +1,43 @@
+---
+description: CSS conventions and design tokens for the dark theme
+globs: src/**/*.css
+alwaysApply: false
+---
+
+# Styling conventions
+
+All styles live in `src/index.css`. No CSS modules, no component-scoped stylesheets.
+
+## Theme tokens (CSS custom properties)
+
+```
+--bg-from / --bg-to     Page gradient (#0f172a → #1e293b)
+--text                   Body text (#e2e8f0)
+--text-muted             Secondary text (#94a3b8)
+--text-dim               Tertiary text (#64748b)
+--text-bright            Headings / emphasis (#f1f5f9)
+--surface                Card background (rgba(30, 41, 59, 0.8))
+--border                 Card / input borders (rgba(148, 163, 184, 0.15))
+--accent-from / --accent-to  Button gradient (#3b82f6 → #6366f1)
+--accent / --accent-muted    Focus rings, active states
+--radius / --radius-sm / --radius-xs  16px / 8px / 6px
+--font-sans / --font-mono    System sans-serif / monospace stacks
+```
+
+## Naming
+
+BEM-inspired flat classes: `.block__element--modifier`. No nesting beyond hover/active pseudo-classes.
+
+- `.panel`, `.panel__header`, `.panel__body`
+- `.rendition-item`, `.rendition-item--active`, `.rendition-item__primary`
+- `.track-item`, `.track-item--active`, `.track-item--info`
+- `.badge`, `.badge--live`, `.badge--vod`, `.badge--default`
+
+## Glass-card surface
+
+Panels use: `background: var(--surface)`, `border: 1px solid var(--border)`, `border-radius: var(--radius)`, `backdrop-filter: blur(12px)`.
+
+## Responsive breakpoints
+
+- `900px` — two-column grid collapses to single column
+- `600px` — URL form stacks vertically, summary grid goes to 2 columns, app padding shrinks

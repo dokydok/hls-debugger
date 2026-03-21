@@ -1,0 +1,38 @@
+---
+description: HLS playback integration patterns (hls.js and native Safari)
+globs: src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# HLS playback patterns
+
+All player logic lives in `src/App.tsx`. The player lifecycle is driven by `activeUrl` via a `useEffect`.
+
+## Lifecycle
+
+1. `destroyPlayer()` — always call before creating a new instance. Destroys hls.js, clears video src, resets runtime track state.
+2. Branch on `Hls.isSupported()` (MSE) vs `video.canPlayType('application/vnd.apple.mpegurl')` (native).
+3. Store instance in `hlsRef.current`; set `isNativeRef.current` accordingly.
+4. Cleanup returns `destroyPlayer`.
+
+## hls.js event wiring
+
+After `hls.loadSource()` + `hls.attachMedia()`, register listeners:
+
+- `MANIFEST_PARSED` — populate `RuntimeTrack[]` from `hls.audioTracks` / `hls.subtitleTracks`, then call `video.play()`.
+- `AUDIO_TRACK_SWITCHED` — update `currentAudioTrack` state.
+- `SUBTITLE_TRACK_SWITCH` — update `currentSubtitleTrack` state.
+- `ERROR` — on fatal `MEDIA_ERROR` call `hls.recoverMediaError()`; other fatal errors set error state.
+
+To add a new event: register it in the same `useEffect`, update corresponding React state, and reset that state in `destroyPlayer`.
+
+## Track switching
+
+- **hls.js**: set `hlsRef.current.audioTrack = index` or `hlsRef.current.subtitleTrack = index`.
+- **Native audio**: iterate `video.audioTracks`, set `tracks[i].enabled`. Cast via `(video as any).audioTracks` since TypeScript lacks the WebKit type.
+- **Native subtitles**: iterate `video.textTracks`, set `mode = 'showing' | 'disabled'`.
+- Always guard with `if (hlsRef.current && !isNativeRef.current)` for the hls.js path.
+
+## Rendition switching
+
+Does NOT use `hls.currentLevel`. Instead destroys the player and sets `activeUrl` to the variant's media playlist URL, which triggers a full player re-creation via the effect.
