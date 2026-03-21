@@ -12,11 +12,11 @@ export function DateRangeList({ dateRanges }: Props) {
       <table className="data-table">
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Class</th>
-            <th>Start</th>
-            <th>Duration</th>
-            <th>SCTE-35</th>
+            <th title="EXT-X-DATERANGE ID attribute; uniquely identifies this date range">ID</th>
+            <th title="CLASS attribute; groups related date ranges (e.g. ad breaks)">Class</th>
+            <th title="START-DATE; wall-clock time when this date range begins">Start</th>
+            <th title="DURATION or PLANNED-DURATION in seconds">Duration</th>
+            <th title="SCTE-35 splice commands embedded in this date range">SCTE-35</th>
           </tr>
         </thead>
         <tbody>
@@ -35,9 +35,9 @@ export function DateRangeList({ dateRanges }: Props) {
                     : '—'}
               </td>
               <td>
-                {dr.scte35Out && <span className="badge badge--live">OUT</span>}
-                {dr.scte35In && <span className="badge badge--vod">IN</span>}
-                {dr.scte35Cmd && <span className="badge badge--default">CMD</span>}
+                {dr.scte35Out && <span className="badge badge--live" title="SCTE35-OUT splice insert; marks start of ad break">OUT</span>}
+                {dr.scte35In && <span className="badge badge--vod" title="SCTE35-IN splice insert; marks end of ad break">IN</span>}
+                {dr.scte35Cmd && <span className="badge badge--default" title="SCTE35-CMD raw splice command">CMD</span>}
                 {!dr.scte35Out && !dr.scte35In && !dr.scte35Cmd && '—'}
               </td>
             </tr>

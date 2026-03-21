@@ -11,10 +11,10 @@ export function LowLatencyPanel({ info }: Props) {
     <div>
       <div className="summary-grid">
         {info.partTargetDuration != null && (
-          <Item label="Part Target" value={`${info.partTargetDuration}s`} />
+          <Item label="Part Target" value={`${info.partTargetDuration}s`} tooltip="EXT-X-PART-INF; target duration for partial segments" />
         )}
         {info.totalPartsCount > 0 && (
-          <Item label="Total Parts" value={String(info.totalPartsCount)} />
+          <Item label="Total Parts" value={String(info.totalPartsCount)} tooltip="Total number of EXT-X-PART partial segments across all segments" />
         )}
       </div>
 
@@ -23,19 +23,19 @@ export function LowLatencyPanel({ info }: Props) {
           <p className="group-label">Server Control</p>
           <div className="summary-grid">
             {info.serverControl.canBlockReload != null && (
-              <Item label="Block Reload" value={info.serverControl.canBlockReload ? 'Yes' : 'No'} />
+              <Item label="Block Reload" value={info.serverControl.canBlockReload ? 'Yes' : 'No'} tooltip="CAN-BLOCK-RELOAD; server supports blocking playlist reload requests" />
             )}
             {info.serverControl.holdBack != null && (
-              <Item label="Hold Back" value={`${info.serverControl.holdBack}s`} />
+              <Item label="Hold Back" value={`${info.serverControl.holdBack}s`} tooltip="HOLD-BACK; how far from the live edge the player should stay" />
             )}
             {info.serverControl.partHoldBack != null && (
-              <Item label="Part Hold Back" value={`${info.serverControl.partHoldBack}s`} />
+              <Item label="Part Hold Back" value={`${info.serverControl.partHoldBack}s`} tooltip="PART-HOLD-BACK; how far from the live edge for partial segment playback" />
             )}
             {info.serverControl.canSkipUntil != null && (
-              <Item label="Can Skip Until" value={`${info.serverControl.canSkipUntil}s`} />
+              <Item label="Can Skip Until" value={`${info.serverControl.canSkipUntil}s`} tooltip="CAN-SKIP-UNTIL; server can omit segments older than this from playlist updates" />
             )}
             {info.serverControl.canSkipDateranges != null && (
-              <Item label="Skip Dateranges" value={info.serverControl.canSkipDateranges ? 'Yes' : 'No'} />
+              <Item label="Skip Dateranges" value={info.serverControl.canSkipDateranges ? 'Yes' : 'No'} tooltip="CAN-SKIP-DATERANGES; server can omit date range tags in skipped sections" />
             )}
           </div>
         </div>
@@ -77,7 +77,7 @@ export function LowLatencyPanel({ info }: Props) {
           <p className="group-label">Skip</p>
           <div className="summary-grid">
             {info.skip.skippedSegments != null && (
-              <Item label="Skipped Segments" value={String(info.skip.skippedSegments)} />
+              <Item label="Skipped Segments" value={String(info.skip.skippedSegments)} tooltip="SKIPPED-SEGMENTS; number of segments omitted via delta playlist update" />
             )}
           </div>
         </div>
@@ -86,10 +86,10 @@ export function LowLatencyPanel({ info }: Props) {
   );
 }
 
-function Item({ label, value }: { label: string; value: string }) {
+function Item({ label, value, tooltip }: { label: string; value: string; tooltip?: string }) {
   return (
     <div className="summary-item">
-      <span className="summary-item__label">{label}</span>
+      <span className="summary-item__label" title={tooltip}>{label}</span>
       <span className="summary-item__value">{value}</span>
     </div>
   );

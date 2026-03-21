@@ -10,16 +10,16 @@ export function EncryptionDetails({ encryption }: Props) {
   return (
     <div>
       <div className="summary-grid">
-        <Item label="Method" value={encryption.method || 'Unknown'} />
+        <Item label="Method" value={encryption.method || 'Unknown'} tooltip="EXT-X-KEY METHOD; encryption algorithm (AES-128, SAMPLE-AES, etc.)" />
         {encryption.keyUri && (
           <div className="summary-item">
-            <span className="summary-item__label">Key URI</span>
+            <span className="summary-item__label" title="URL where the decryption key can be fetched">Key URI</span>
             <span className="summary-item__value truncate" title={encryption.keyUri}>
               {encryption.keyUri}
             </span>
           </div>
         )}
-        <Item label="Key Rotations" value={String(encryption.keyRotationCount)} />
+        <Item label="Key Rotations" value={String(encryption.keyRotationCount)} tooltip="Number of distinct encryption keys used; more than 1 means key rotation" />
       </div>
 
       {encryption.uniqueKeys.length > 1 && (
@@ -50,10 +50,10 @@ export function EncryptionDetails({ encryption }: Props) {
   );
 }
 
-function Item({ label, value }: { label: string; value: string }) {
+function Item({ label, value, tooltip }: { label: string; value: string; tooltip?: string }) {
   return (
     <div className="summary-item">
-      <span className="summary-item__label">{label}</span>
+      <span className="summary-item__label" title={tooltip}>{label}</span>
       <span className="summary-item__value">{value}</span>
     </div>
   );

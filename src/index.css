@@ -426,6 +426,12 @@ body {
   color: var(--text-dim);
 }
 
+.summary-item__label[title] {
+  text-decoration: underline dotted rgba(148, 163, 184, 0.35);
+  text-underline-offset: 3px;
+  cursor: help;
+}
+
 .summary-item__value {
   font-size: 0.9rem;
   font-weight: 500;
@@ -618,6 +624,12 @@ body {
   font-size: 0.65rem;
   white-space: nowrap;
   border-bottom: 1px solid var(--border);
+}
+
+.data-table th[title] {
+  text-decoration: underline dotted rgba(148, 163, 184, 0.35);
+  text-underline-offset: 3px;
+  cursor: help;
 }
 
 .data-table td {

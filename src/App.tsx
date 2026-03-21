@@ -22,6 +22,7 @@ function App() {
   const [manifest, setManifest] = useState<ParsedManifest | null>(null);
   const [masterUrl, setMasterUrl] = useState('');
   const [activeUrl, setActiveUrl] = useState<string | null>(null);
+  const [mediaManifest, setMediaManifest] = useState<ParsedManifest | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -160,11 +161,47 @@ function App() {
     };
   }, [activeUrl, destroyPlayer]);
 
+  useEffect(() => {
+    if (!manifest?.isMaster) {
+      setMediaManifest(null);
+      return;
+    }
+
+    const variantUrl =
+      activeUrl && activeUrl !== masterUrl
+        ? activeUrl
+        : manifest.variants[0]?.uri;
+
+    if (!variantUrl) {
+      setMediaManifest(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch(variantUrl, { mode: 'cors' });
+        if (!res.ok || cancelled) return;
+        const text = await res.text();
+        if (cancelled) return;
+        const parsed = parseManifest(text, variantUrl);
+        parsed.issues = validateManifest(parsed);
+        setMediaManifest(parsed);
+      } catch {
+        if (!cancelled) setMediaManifest(null);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [activeUrl, masterUrl, manifest]);
+
   const handleSubmit = useCallback(
     async (inputUrl: string) => {
       setLoading(true);
       setError(null);
       setManifest(null);
+      setMediaManifest(null);
       setActiveUrl(null);
       destroyPlayer();
 
@@ -230,11 +267,18 @@ function App() {
     }
   }, []);
 
-  const streamType = manifest
-    ? manifest.liveStream?.isLive
-      ? manifest.liveStream.isEvent ? 'EVENT' : manifest.liveStream.isDVR ? 'LIVE DVR' : 'LIVE'
-      : manifest.endList ? 'VOD' : manifest.isMaster ? undefined : undefined
+  const details = mediaManifest ?? (manifest && !manifest.isMaster ? manifest : null);
+
+  const streamType = details
+    ? details.liveStream?.isLive
+      ? details.liveStream.isEvent ? 'EVENT' : details.liveStream.isDVR ? 'LIVE DVR' : 'LIVE'
+      : details.endList ? 'VOD' : undefined
     : undefined;
+
+  const allIssues = [
+    ...(manifest?.issues ?? []),
+    ...(mediaManifest?.issues ?? []),
+  ];
 
   const audioTrackCount =
     manifest?.audioGroups.reduce((n, g) => n + g.tracks.length, 0) ?? 0;
@@ -282,19 +326,19 @@ function App() {
           </div>
 
           <div className="app__details-col">
-            {manifest.issues.length > 0 && (
-              <CollapsiblePanel title="Issues" count={manifest.issues.length}>
-                <ManifestIssues issues={manifest.issues} />
+            {allIssues.length > 0 && (
+              <CollapsiblePanel title="Issues" count={allIssues.length}>
+                <ManifestIssues issues={allIssues} />
               </CollapsiblePanel>
             )}
 
             <CollapsiblePanel title="Summary">
               <div className="summary-grid">
-                <SummaryItem label="Type" value={manifest.isMaster ? 'Master' : 'Media'} />
+                <SummaryItem label="Type" value={manifest.isMaster ? 'Master' : 'Media'} tooltip="Master playlists list variants; Media playlists contain segments" />
 
                 {streamType && (
                   <div className="summary-item">
-                    <span className="summary-item__label">Stream</span>
+                    <span className="summary-item__label" title="VOD = complete recording, LIVE = ongoing stream, EVENT = append-only live">Stream</span>
                     <span className="summary-item__value">
                       <span className={`badge badge--${streamType === 'VOD' ? 'vod' : streamType === 'EVENT' ? 'event' : 'live'}`}>
                         {streamType}
@@ -304,50 +348,51 @@ function App() {
                 )}
 
                 {manifest.version != null && (
-                  <SummaryItem label="Version" value={String(manifest.version)} />
+                  <SummaryItem label="Version" value={String(manifest.version)} tooltip="EXT-X-VERSION; determines which HLS features are available" />
                 )}
 
-                {manifest.targetDuration != null && (
-                  <SummaryItem label="Target Duration" value={`${manifest.targetDuration}s`} />
+                {(details?.targetDuration ?? manifest.targetDuration) != null && (
+                  <SummaryItem label="Target Duration" value={`${details?.targetDuration ?? manifest.targetDuration}s`} tooltip="EXT-X-TARGETDURATION; max allowed segment duration in seconds" />
                 )}
 
-                {manifest.segmentAnalysis && (
+                {details?.segmentAnalysis && (
                   <SummaryItem
                     label="Total Duration"
-                    value={formatDuration(manifest.segmentAnalysis.totalDuration)}
+                    value={formatDuration(details.segmentAnalysis.totalDuration)}
+                    tooltip="Sum of all segment durations"
                   />
                 )}
 
-                {manifest.segments.length > 0 && (
-                  <SummaryItem label="Segments" value={String(manifest.segments.length)} />
+                {(details?.segments.length ?? 0) > 0 && (
+                  <SummaryItem label="Segments" value={String(details!.segments.length)} tooltip="Number of media segments in the playlist" />
                 )}
 
                 {manifest.isMaster && (
-                  <SummaryItem label="Variants" value={String(manifest.variants.length)} />
+                  <SummaryItem label="Variants" value={String(manifest.variants.length)} tooltip="Number of quality levels (EXT-X-STREAM-INF entries)" />
                 )}
 
-                {manifest.encryption.isEncrypted && (
+                {(details?.encryption ?? manifest.encryption).isEncrypted && (
                   <div className="summary-item">
-                    <span className="summary-item__label">Encryption</span>
+                    <span className="summary-item__label" title="EXT-X-KEY encryption method">Encryption</span>
                     <span className="summary-item__value">
                       <span className="badge badge--encrypted">
-                        {manifest.encryption.method || 'Yes'}
+                        {(details?.encryption ?? manifest.encryption).method || 'Yes'}
                       </span>
                     </span>
                   </div>
                 )}
 
-                {(manifest.discontinuityCount ?? 0) > 0 && (
-                  <SummaryItem label="Discontinuities" value={String(manifest.discontinuityCount)} />
+                {((details?.discontinuityCount ?? manifest.discontinuityCount) ?? 0) > 0 && (
+                  <SummaryItem label="Discontinuities" value={String(details?.discontinuityCount ?? manifest.discontinuityCount)} tooltip="Number of EXT-X-DISCONTINUITY tags; signals codec or timestamp changes" />
                 )}
 
-                {manifest.discontinuitySequence != null && manifest.discontinuitySequence > 0 && (
-                  <SummaryItem label="Disc. Sequence" value={String(manifest.discontinuitySequence)} />
+                {(details?.discontinuitySequence ?? manifest.discontinuitySequence) != null && (details?.discontinuitySequence ?? manifest.discontinuitySequence)! > 0 && (
+                  <SummaryItem label="Disc. Sequence" value={String(details?.discontinuitySequence ?? manifest.discontinuitySequence)} tooltip="EXT-X-DISCONTINUITY-SEQUENCE; base for discontinuity numbering" />
                 )}
 
                 {manifest.independentSegments && (
                   <div className="summary-item">
-                    <span className="summary-item__label">Independent Segments</span>
+                    <span className="summary-item__label" title="EXT-X-INDEPENDENT-SEGMENTS; each segment can be decoded independently">Independent Segments</span>
                     <span className="summary-item__value">
                       <span className="badge badge--vod">Yes</span>
                     </span>
@@ -358,24 +403,25 @@ function App() {
                   <SummaryItem
                     label="Start Offset"
                     value={`${manifest.start.timeOffset}s${manifest.start.precise ? ' (precise)' : ''}`}
+                    tooltip="EXT-X-START; suggested initial playback position"
                   />
                 )}
 
-                {manifest.mediaSequence != null && manifest.mediaSequence > 0 && (
-                  <SummaryItem label="Media Sequence" value={String(manifest.mediaSequence)} />
+                {(details?.mediaSequence ?? manifest.mediaSequence) != null && (details?.mediaSequence ?? manifest.mediaSequence)! > 0 && (
+                  <SummaryItem label="Media Sequence" value={String(details?.mediaSequence ?? manifest.mediaSequence)} tooltip="EXT-X-MEDIA-SEQUENCE; sequence number of the first segment" />
                 )}
               </div>
             </CollapsiblePanel>
 
-            {manifest.segmentAnalysis && (
+            {details?.segmentAnalysis && (
               <CollapsiblePanel
                 title="Segment Analysis"
-                count={manifest.segments.length}
+                count={details.segments.length}
               >
                 <SegmentAnalysis
-                  analysis={manifest.segmentAnalysis}
-                  targetDuration={manifest.targetDuration}
-                  liveStream={manifest.liveStream}
+                  analysis={details.segmentAnalysis}
+                  targetDuration={details.targetDuration}
+                  liveStream={details.liveStream}
                 />
               </CollapsiblePanel>
             )}
@@ -407,21 +453,21 @@ function App() {
               />
             </CollapsiblePanel>
 
-            {manifest.encryption.isEncrypted && (
+            {(details?.encryption ?? manifest.encryption).isEncrypted && (
               <CollapsiblePanel title="Encryption Details">
-                <EncryptionDetails encryption={manifest.encryption} />
+                <EncryptionDetails encryption={details?.encryption ?? manifest.encryption} />
               </CollapsiblePanel>
             )}
 
-            {manifest.dateRanges.length > 0 && (
-              <CollapsiblePanel title="Date Ranges" count={manifest.dateRanges.length}>
-                <DateRangeList dateRanges={manifest.dateRanges} />
+            {(details?.dateRanges ?? manifest.dateRanges).length > 0 && (
+              <CollapsiblePanel title="Date Ranges" count={(details?.dateRanges ?? manifest.dateRanges).length}>
+                <DateRangeList dateRanges={details?.dateRanges ?? manifest.dateRanges} />
               </CollapsiblePanel>
             )}
 
-            {manifest.lowLatency.hasLowLatency && (
+            {(details?.lowLatency ?? manifest.lowLatency).hasLowLatency && (
               <CollapsiblePanel title="Low-Latency HLS">
-                <LowLatencyPanel info={manifest.lowLatency} />
+                <LowLatencyPanel info={details?.lowLatency ?? manifest.lowLatency} />
               </CollapsiblePanel>
             )}
 
@@ -431,15 +477,15 @@ function App() {
               </CollapsiblePanel>
             )}
 
-            {manifest.segments.length > 0 && (
+            {(details?.segments.length ?? 0) > 0 && (
               <CollapsiblePanel
                 title="Segment List"
-                count={manifest.segments.length}
+                count={details!.segments.length}
                 defaultOpen={false}
               >
                 <SegmentList
-                  segments={manifest.segments}
-                  targetDuration={manifest.targetDuration}
+                  segments={details!.segments}
+                  targetDuration={details!.targetDuration}
                 />
               </CollapsiblePanel>
             )}
@@ -466,10 +512,10 @@ function App() {
   );
 }
 
-function SummaryItem({ label, value }: { label: string; value: string }) {
+function SummaryItem({ label, value, tooltip }: { label: string; value: string; tooltip?: string }) {
   return (
     <div className="summary-item">
-      <span className="summary-item__label">{label}</span>
+      <span className="summary-item__label" title={tooltip}>{label}</span>
       <span className="summary-item__value">{value}</span>
     </div>
   );
