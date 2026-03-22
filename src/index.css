@@ -195,6 +195,49 @@ body {
   cursor: not-allowed;
 }
 
+/* ── Icon Buttons & Snapshot ──────────────────────────────── */
+
+.icon-btn,
+.url-form__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.icon-btn:hover,
+.url-form__icon-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.app__header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.app__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.badge--snapshot {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+}
+
 /* ── Video Panel ───────────────────────────────────────────── */
 
 .video-panel {

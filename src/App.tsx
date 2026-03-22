@@ -16,6 +16,7 @@ import { IFrameList } from './components/IFrameList';
 import { SubManifests } from './components/SubManifests';
 import { parseManifest } from './lib/parseManifest';
 import { validateManifest } from './lib/validateManifest';
+import { buildSnapshot, parseSnapshot, downloadSnapshot } from './lib/snapshot';
 import type { ParsedManifest, RuntimeTrack } from './lib/types';
 
 function getInitialUrl(): string {
@@ -34,6 +35,8 @@ function App() {
   const [mediaManifest, setMediaManifest] = useState<ParsedManifest | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [snapshotMode, setSnapshotMode] = useState(false);
+  const [subManifestCache, setSubManifestCache] = useState<Record<string, string>>({});
 
   const [hlsAudioTracks, setHlsAudioTracks] = useState<RuntimeTrack[]>([]);
   const [hlsSubtitleTracks, setHlsSubtitleTracks] = useState<RuntimeTrack[]>([]);
@@ -63,7 +66,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!activeUrl) return;
+    if (!activeUrl || snapshotMode) return;
     const video = videoRef.current;
     if (!video) return;
 
@@ -161,9 +164,10 @@ function App() {
     return () => {
       destroyPlayer();
     };
-  }, [activeUrl, destroyPlayer]);
+  }, [activeUrl, destroyPlayer, snapshotMode]);
 
   useEffect(() => {
+    if (snapshotMode) return;
     if (!manifest?.isMaster) {
       setMediaManifest(null);
       return;
@@ -196,7 +200,40 @@ function App() {
     })();
 
     return () => { cancelled = true; };
-  }, [activeUrl, masterUrl, manifest]);
+  }, [activeUrl, masterUrl, manifest, snapshotMode]);
+
+  useEffect(() => {
+    if (snapshotMode || !manifest?.isMaster) return;
+
+    const uris: string[] = [];
+    for (const v of manifest.variants) uris.push(v.uri);
+    for (const g of manifest.audioGroups)
+      for (const t of g.tracks) if (t.uri) uris.push(t.uri);
+    for (const g of manifest.subtitleGroups)
+      for (const t of g.tracks) if (t.uri) uris.push(t.uri);
+
+    if (uris.length === 0) return;
+
+    let cancelled = false;
+
+    (async () => {
+      const results = await Promise.allSettled(
+        uris.map(async (uri) => {
+          const res = await fetch(uri, { mode: 'cors' });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return { uri, text: await res.text() };
+        }),
+      );
+      if (cancelled) return;
+      const cache: Record<string, string> = {};
+      for (const r of results) {
+        if (r.status === 'fulfilled') cache[r.value.uri] = r.value.text;
+      }
+      setSubManifestCache(cache);
+    })();
+
+    return () => { cancelled = true; };
+  }, [manifest, snapshotMode]);
 
   const handleSubmit = useCallback(
     async (inputUrl: string) => {
@@ -205,6 +242,8 @@ function App() {
       setManifest(null);
       setMediaManifest(null);
       setActiveUrl(null);
+      setSnapshotMode(false);
+      setSubManifestCache({});
       destroyPlayer();
 
       try {
@@ -277,6 +316,54 @@ function App() {
     }
   }, []);
 
+  const handleExport = useCallback(() => {
+    if (!manifest) return;
+    const snapshot = buildSnapshot({
+      manifest,
+      masterUrl,
+      activeUrl,
+      mediaManifest,
+      subManifestCache,
+    });
+    downloadSnapshot(snapshot);
+  }, [manifest, masterUrl, activeUrl, mediaManifest, subManifestCache]);
+
+  const handleImport = useCallback(async (file: File) => {
+    try {
+      const text = await file.text();
+      const json = JSON.parse(text);
+      const snap = parseSnapshot(json);
+
+      destroyPlayer();
+      setError(null);
+      setLoading(false);
+
+      const parsed = parseManifest(snap.masterPlaylistText, snap.masterUrl);
+      parsed.issues = validateManifest(parsed);
+      setManifest(parsed);
+      setMasterUrl(snap.masterUrl);
+
+      if (snap.mediaPlaylist) {
+        const media = parseManifest(snap.mediaPlaylist.text, snap.mediaPlaylist.url);
+        media.issues = validateManifest(media);
+        setMediaManifest(media);
+      } else {
+        setMediaManifest(null);
+      }
+
+      setActiveUrl(snap.activePlaybackUrl ?? snap.masterUrl);
+      setSubManifestCache(snap.subManifests ?? {});
+      setSnapshotMode(true);
+
+      const params = new URLSearchParams(window.location.search);
+      params.delete('url');
+      const qs = params.toString();
+      window.history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to import snapshot');
+    }
+  }, [destroyPlayer]);
+
   const details = mediaManifest ?? (manifest && !manifest.isMaster ? manifest : null);
 
   const streamType = details
@@ -299,11 +386,31 @@ function App() {
   return (
     <div className="app">
       <header className="app__header">
-        <h1>HLS Stream Debugger</h1>
+        <div className="app__header-row">
+          <h1>HLS Stream Debugger</h1>
+          <div className="app__header-actions">
+            {snapshotMode && (
+              <span className="badge badge--snapshot">Offline Snapshot</span>
+            )}
+            {manifest && (
+              <button
+                className="icon-btn"
+                onClick={handleExport}
+                title="Export snapshot"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
         <p>Paste an HLS manifest URL to inspect and play the stream</p>
       </header>
 
-      <UrlForm onSubmit={handleSubmit} loading={loading} initialUrl={initialUrl} />
+      <UrlForm onSubmit={handleSubmit} loading={loading} initialUrl={initialUrl} onImport={handleImport} />
 
       {error && <div className="error-message">{error}</div>}
 
@@ -317,7 +424,11 @@ function App() {
       {manifest && (
         <div className="app__content">
           <div className="app__player-col">
-            <VideoPanel ref={videoRef} hasSource={!!activeUrl} />
+            <VideoPanel
+              ref={videoRef}
+              hasSource={!snapshotMode && !!activeUrl}
+              offlineMessage={snapshotMode ? 'Offline snapshot — playback not available' : undefined}
+            />
 
             {manifest.isMaster && manifest.variants.length > 0 && (
               <CollapsiblePanel
@@ -330,6 +441,7 @@ function App() {
                   masterUrl={masterUrl}
                   onPlayVariant={handlePlayVariant}
                   onPlayMaster={handlePlayMaster}
+                  playbackDisabled={snapshotMode}
                 />
               </CollapsiblePanel>
             )}
@@ -445,7 +557,7 @@ function App() {
                 runtimeTracks={hlsAudioTracks}
                 currentTrack={currentAudioTrack}
                 onSwitch={handleSwitchAudio}
-                hasPlayer={!!activeUrl}
+                hasPlayer={!snapshotMode && !!activeUrl}
               />
             </CollapsiblePanel>
 
@@ -459,7 +571,7 @@ function App() {
                 runtimeTracks={hlsSubtitleTracks}
                 currentTrack={currentSubtitleTrack}
                 onSwitch={handleSwitchSubtitle}
-                hasPlayer={!!activeUrl}
+                hasPlayer={!snapshotMode && !!activeUrl}
               />
             </CollapsiblePanel>
 
@@ -506,6 +618,7 @@ function App() {
                   variants={manifest.variants}
                   audioGroups={manifest.audioGroups}
                   subtitleGroups={manifest.subtitleGroups}
+                  cache={subManifestCache}
                 />
               </CollapsiblePanel>
             )}

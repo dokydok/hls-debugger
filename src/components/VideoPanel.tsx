@@ -2,10 +2,11 @@ import { forwardRef } from 'react';
 
 interface Props {
   hasSource: boolean;
+  offlineMessage?: string;
 }
 
 export const VideoPanel = forwardRef<HTMLVideoElement, Props>(
-  function VideoPanel({ hasSource }, ref) {
+  function VideoPanel({ hasSource, offlineMessage }, ref) {
     return (
       <div className="video-panel">
         <video
@@ -17,7 +18,7 @@ export const VideoPanel = forwardRef<HTMLVideoElement, Props>(
         />
         {!hasSource && (
           <div className="video-panel__placeholder">
-            Enter an HLS URL above to start debugging
+            {offlineMessage ?? 'Enter an HLS URL above to start debugging'}
           </div>
         )}
       </div>

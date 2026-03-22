@@ -6,20 +6,15 @@ interface Entry {
   uri: string;
 }
 
-interface FetchState {
-  text: string;
-  loading: boolean;
-  error?: string;
-}
-
 interface Props {
   variants: Variant[];
   audioGroups: MediaTrackGroup[];
   subtitleGroups: MediaTrackGroup[];
+  cache: Record<string, string>;
 }
 
-export function SubManifests({ variants, audioGroups, subtitleGroups }: Props) {
-  const [fetched, setFetched] = useState<Record<string, FetchState>>({});
+export function SubManifests({ variants, audioGroups, subtitleGroups, cache }: Props) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const entries: Entry[] = [];
 
@@ -42,27 +37,8 @@ export function SubManifests({ variants, audioGroups, subtitleGroups }: Props) {
     }
   }
 
-  const handleFetch = useCallback(async (uri: string) => {
-    setFetched(prev => ({ ...prev, [uri]: { text: '', loading: true } }));
-    try {
-      const res = await fetch(uri, { mode: 'cors' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const text = await res.text();
-      setFetched(prev => ({ ...prev, [uri]: { text, loading: false } }));
-    } catch (err) {
-      setFetched(prev => ({
-        ...prev,
-        [uri]: { text: '', loading: false, error: err instanceof Error ? err.message : 'Fetch failed' },
-      }));
-    }
-  }, []);
-
-  const handleHide = useCallback((uri: string) => {
-    setFetched(prev => {
-      const next = { ...prev };
-      delete next[uri];
-      return next;
-    });
+  const toggle = useCallback((uri: string) => {
+    setExpanded(prev => ({ ...prev, [uri]: !prev[uri] }));
   }, []);
 
   if (entries.length === 0) {
@@ -72,7 +48,8 @@ export function SubManifests({ variants, audioGroups, subtitleGroups }: Props) {
   return (
     <div className="sub-manifests">
       {entries.map((entry) => {
-        const state = fetched[entry.uri];
+        const text = cache[entry.uri];
+        const isOpen = expanded[entry.uri];
         return (
           <div key={entry.uri} className="sub-manifest-entry">
             <div className="sub-manifest-entry__header">
@@ -82,26 +59,17 @@ export function SubManifests({ variants, audioGroups, subtitleGroups }: Props) {
                   {fileName(entry.uri)}
                 </span>
               </div>
-              {!state?.text ? (
-                <button
-                  className="btn btn--ghost"
-                  onClick={() => handleFetch(entry.uri)}
-                  disabled={state?.loading}
-                >
-                  {state?.loading ? 'Loading…' : 'Fetch'}
+              {text ? (
+                <button className="btn btn--ghost" onClick={() => toggle(entry.uri)}>
+                  {isOpen ? 'Hide' : 'Show'}
                 </button>
               ) : (
-                <button className="btn btn--ghost" onClick={() => handleHide(entry.uri)}>
-                  Hide
-                </button>
+                <span className="text-dim" style={{ fontSize: '0.8rem' }}>Loading…</span>
               )}
             </div>
-            {state?.error && (
-              <div className="sub-manifest-entry__error">{state.error}</div>
-            )}
-            {state?.text && (
+            {isOpen && text && (
               <div className="raw-manifest" style={{ marginTop: 8 }}>
-                <pre>{state.text}</pre>
+                <pre>{text}</pre>
               </div>
             )}
           </div>
