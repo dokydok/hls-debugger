@@ -65,35 +65,28 @@ function App() {
       hlsRef.current = hls;
       isNativeRef.current = false;
 
+      const syncTracks = () => {
+        const at = hls.audioTracks;
+        if (at.length > 0) {
+          setHlsAudioTracks(at.map((t, i) => ({ id: i, name: t.name || `Track ${i + 1}`, language: t.lang })));
+          setCurrentAudioTrack(hls.audioTrack);
+        }
+        const st = hls.subtitleTracks;
+        if (st.length > 0) {
+          setHlsSubtitleTracks(st.map((t, i) => ({ id: i, name: t.name || `Track ${i + 1}`, language: t.lang })));
+          setCurrentSubtitleTrack(hls.subtitleTrack);
+        }
+      };
+
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        setHlsAudioTracks(
-          hls.audioTracks.map((t, i) => ({
-            id: i,
-            name: t.name || `Track ${i + 1}`,
-            language: t.lang,
-          })),
-        );
-        setCurrentAudioTrack(hls.audioTrack);
-
-        setHlsSubtitleTracks(
-          hls.subtitleTracks.map((t, i) => ({
-            id: i,
-            name: t.name || `Track ${i + 1}`,
-            language: t.lang,
-          })),
-        );
-        setCurrentSubtitleTrack(hls.subtitleTrack);
-
+        syncTracks();
         video.play().catch(() => {});
       });
-
-      hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_, data) => {
-        setCurrentAudioTrack(data.id);
-      });
-
-      hls.on(Hls.Events.SUBTITLE_TRACK_SWITCH, (_, data) => {
-        setCurrentSubtitleTrack(data.id);
-      });
+      hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, syncTracks);
+      hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, syncTracks);
+      hls.on(Hls.Events.LEVEL_LOADED, syncTracks);
+      hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_, data) => setCurrentAudioTrack(data.id));
+      hls.on(Hls.Events.SUBTITLE_TRACK_SWITCH, (_, data) => setCurrentSubtitleTrack(data.id));
 
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.fatal) {
