@@ -18,7 +18,16 @@ import { parseManifest } from './lib/parseManifest';
 import { validateManifest } from './lib/validateManifest';
 import type { ParsedManifest, RuntimeTrack } from './lib/types';
 
+function getInitialUrl(): string {
+  try {
+    return new URLSearchParams(window.location.search).get('url') ?? '';
+  } catch {
+    return '';
+  }
+}
+
 function App() {
+  const [initialUrl] = useState(getInitialUrl);
   const [manifest, setManifest] = useState<ParsedManifest | null>(null);
   const [masterUrl, setMasterUrl] = useState('');
   const [activeUrl, setActiveUrl] = useState<string | null>(null);
@@ -207,6 +216,10 @@ function App() {
         setManifest(parsed);
         setMasterUrl(inputUrl);
         setActiveUrl(inputUrl);
+
+        const params = new URLSearchParams(window.location.search);
+        params.set('url', inputUrl);
+        window.history.replaceState(null, '', `?${params}`);
       } catch (err: unknown) {
         if (err instanceof TypeError) {
           setError(
@@ -223,6 +236,10 @@ function App() {
     },
     [destroyPlayer],
   );
+
+  useEffect(() => {
+    if (initialUrl) handleSubmit(initialUrl);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePlayVariant = useCallback((url: string) => {
     setError(null);
@@ -286,7 +303,7 @@ function App() {
         <p>Paste an HLS manifest URL to inspect and play the stream</p>
       </header>
 
-      <UrlForm onSubmit={handleSubmit} loading={loading} />
+      <UrlForm onSubmit={handleSubmit} loading={loading} initialUrl={initialUrl} />
 
       {error && <div className="error-message">{error}</div>}
 

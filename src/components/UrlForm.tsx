@@ -3,10 +3,11 @@ import { useState, type FormEvent } from 'react';
 interface Props {
   onSubmit: (url: string) => void;
   loading: boolean;
+  initialUrl?: string;
 }
 
-export function UrlForm({ onSubmit, loading }: Props) {
-  const [value, setValue] = useState('');
+export function UrlForm({ onSubmit, loading, initialUrl }: Props) {
+  const [value, setValue] = useState(initialUrl ?? '');
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
