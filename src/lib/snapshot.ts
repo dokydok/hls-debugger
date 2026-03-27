@@ -91,9 +91,9 @@ export function downloadSnapshot(snapshot: HlsDebuggerSnapshotV1): void {
   const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const date = new Date().toISOString().slice(0, 10);
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   a.href = url;
-  a.download = `hls-debugger-snapshot-${date}.json`;
+  a.download = `hls-snapshot-${ts}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

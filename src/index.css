@@ -245,6 +245,55 @@ body {
   color: #fbbf24;
 }
 
+/* ── Recording Controls ──────────────────────────────────── */
+
+.recording-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recording-btn--record {
+  color: #ef4444;
+}
+
+.recording-btn--record:hover {
+  color: #f87171;
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.recording-btn--stop {
+  color: #ef4444;
+}
+
+.recording-btn--stop:hover {
+  color: #f87171;
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.recording-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: recording-pulse 1.2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes recording-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.recording-stats {
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 /* ── Video Panel ───────────────────────────────────────────── */
 
 .video-panel {
@@ -270,6 +319,65 @@ body {
   color: var(--text-dim);
   font-size: 0.9rem;
   background: rgba(0, 0, 0, 0.3);
+}
+
+/* ── Live Video Pill ──────────────────────────────────────── */
+
+.video-panel__wrapper {
+  position: relative;
+}
+
+.video-live-pill {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: none;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, opacity 0.3s;
+}
+
+.video-live-pill--live {
+  background: rgba(220, 38, 38, 0.85);
+  color: #fff;
+}
+
+.video-live-pill--live .video-live-pill__dot {
+  background: #fff;
+  animation: recording-pulse 1.2s ease-in-out infinite;
+}
+
+.video-live-pill--behind {
+  background: rgba(30, 41, 59, 0.8);
+  color: #94a3b8;
+}
+
+.video-live-pill--behind:hover {
+  background: rgba(220, 38, 38, 0.85);
+  color: #fff;
+}
+
+.video-live-pill--behind .video-live-pill__dot {
+  background: #64748b;
+}
+
+.video-live-pill--behind:hover .video-live-pill__dot {
+  background: #fff;
+}
+
+.video-live-pill__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 /* ── Rendition list ────────────────────────────────────────── */
@@ -525,6 +633,15 @@ body {
   color: var(--text-muted);
   white-space: pre;
   margin: 0;
+}
+
+.raw-manifest__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
 }
 
 /* ── Master URL bar ────────────────────────────────────────── */

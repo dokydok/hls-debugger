@@ -14,9 +14,11 @@ import { DateRangeList } from './components/DateRangeList';
 import { LowLatencyPanel } from './components/LowLatencyPanel';
 import { IFrameList } from './components/IFrameList';
 import { SubManifests } from './components/SubManifests';
+import { RecordingControls } from './components/RecordingControls';
 import { parseManifest } from './lib/parseManifest';
 import { validateManifest } from './lib/validateManifest';
 import { buildSnapshot, parseSnapshot, downloadSnapshot } from './lib/snapshot';
+import { loadRecordingForPlayback } from './lib/recorder';
 import type { ParsedManifest, RuntimeTrack } from './lib/types';
 
 function getInitialUrl(): string {
@@ -36,7 +38,9 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [snapshotMode, setSnapshotMode] = useState(false);
+  const [localRecording, setLocalRecording] = useState(false);
   const [subManifestCache, setSubManifestCache] = useState<Record<string, string>>({});
+  const recordingCleanupRef = useRef<(() => void) | null>(null);
 
   const [hlsAudioTracks, setHlsAudioTracks] = useState<RuntimeTrack[]>([]);
   const [hlsSubtitleTracks, setHlsSubtitleTracks] = useState<RuntimeTrack[]>([]);
@@ -73,7 +77,10 @@ function App() {
     destroyPlayer();
 
     if (Hls.isSupported()) {
-      const hls = new Hls({ enableWorker: true });
+      const hls = new Hls({
+        enableWorker: true,
+        liveSyncDurationCount: 3,
+      });
       hlsRef.current = hls;
       isNativeRef.current = false;
 
@@ -184,23 +191,77 @@ function App() {
     }
 
     let cancelled = false;
+    let pollTimer: ReturnType<typeof setTimeout> | undefined;
 
-    (async () => {
+    const fetchMediaManifest = async () => {
       try {
-        const res = await fetch(variantUrl, { mode: 'cors' });
+        const res = await fetch(variantUrl, { mode: 'cors', cache: 'no-store' });
         if (!res.ok || cancelled) return;
         const text = await res.text();
         if (cancelled) return;
         const parsed = parseManifest(text, variantUrl);
         parsed.issues = validateManifest(parsed);
         setMediaManifest(parsed);
+
+        // Update sub-manifest cache with latest text for this variant
+        setSubManifestCache(prev => ({ ...prev, [variantUrl]: text }));
+
+        // Schedule next poll for live streams
+        if (!cancelled && parsed.liveStream?.isLive) {
+          const interval = (parsed.liveStream.suggestedPollInterval ?? parsed.targetDuration ?? 6) * 1000;
+          pollTimer = setTimeout(fetchMediaManifest, interval);
+        }
       } catch {
         if (!cancelled) setMediaManifest(null);
       }
-    })();
+    };
 
-    return () => { cancelled = true; };
+    fetchMediaManifest();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(pollTimer);
+    };
   }, [activeUrl, masterUrl, manifest, snapshotMode]);
+
+  // Poll non-master live manifests (single media playlist loaded directly)
+  useEffect(() => {
+    if (snapshotMode || !manifest || manifest.isMaster) return;
+    if (!manifest.liveStream?.isLive) return;
+
+    const manifestUrl = manifest.url;
+    const interval = (manifest.liveStream.suggestedPollInterval ?? manifest.targetDuration ?? 6) * 1000;
+
+    let cancelled = false;
+    let pollTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(manifestUrl, { mode: 'cors', cache: 'no-store' });
+        if (!res.ok || cancelled) return;
+        const text = await res.text();
+        if (cancelled) return;
+        const parsed = parseManifest(text, manifestUrl);
+        parsed.issues = validateManifest(parsed);
+        setManifest(parsed);
+      } catch {
+        // ignore fetch errors, try again next interval
+      }
+
+      if (!cancelled) {
+        pollTimer = setTimeout(poll, interval);
+      }
+    };
+
+    pollTimer = setTimeout(poll, interval);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(pollTimer);
+    };
+    // Only re-run when the URL or snapshot mode changes, not on every manifest update
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshotMode, manifest?.url, manifest?.isMaster, manifest?.liveStream?.isLive]);
 
   useEffect(() => {
     if (snapshotMode || !manifest?.isMaster) return;
@@ -243,7 +304,10 @@ function App() {
       setMediaManifest(null);
       setActiveUrl(null);
       setSnapshotMode(false);
+      setLocalRecording(false);
       setSubManifestCache({});
+      recordingCleanupRef.current?.();
+      recordingCleanupRef.current = null;
       destroyPlayer();
 
       try {
@@ -364,11 +428,43 @@ function App() {
     }
   }, [destroyPlayer]);
 
+  const handleImportZip = useCallback(async (file: File) => {
+    try {
+      destroyPlayer();
+      recordingCleanupRef.current?.();
+      setError(null);
+      setLoading(true);
+
+      const result = await loadRecordingForPlayback(file);
+      recordingCleanupRef.current = result.cleanup;
+
+      result.manifest.issues = validateManifest(result.manifest);
+      setManifest(result.manifest);
+      setMasterUrl(result.masterBlobUrl);
+      setActiveUrl(result.masterBlobUrl);
+      setMediaManifest(null);
+      setSubManifestCache(result.subManifestCache);
+      setSnapshotMode(false);
+      setLocalRecording(true);
+      setLoading(false);
+
+      const params = new URLSearchParams(window.location.search);
+      params.delete('url');
+      const qs = params.toString();
+      window.history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
+    } catch (err) {
+      setLoading(false);
+      setError(err instanceof Error ? err.message : 'Failed to import recording');
+    }
+  }, [destroyPlayer]);
+
   const details = mediaManifest ?? (manifest && !manifest.isMaster ? manifest : null);
 
+  const isLive = details?.liveStream?.isLive ?? false;
+
   const streamType = details
-    ? details.liveStream?.isLive
-      ? details.liveStream.isEvent ? 'EVENT' : details.liveStream.isDVR ? 'LIVE DVR' : 'LIVE'
+    ? isLive
+      ? details.liveStream?.isEvent ? 'EVENT' : details.liveStream?.isDVR ? 'LIVE DVR' : 'LIVE'
       : details.endList ? 'VOD' : undefined
     : undefined;
 
@@ -392,6 +488,17 @@ function App() {
             {snapshotMode && (
               <span className="badge badge--snapshot">Offline Snapshot</span>
             )}
+            {localRecording && (
+              <span className="badge badge--vod">Local Recording</span>
+            )}
+            {manifest && !snapshotMode && !localRecording && (
+              <RecordingControls
+                manifest={manifest}
+                masterUrl={masterUrl}
+                needsPolling={isLive && !details?.liveStream?.isEvent}
+                getPlaybackTime={() => videoRef.current?.currentTime ?? 0}
+              />
+            )}
             {manifest && (
               <button
                 className="icon-btn"
@@ -410,7 +517,7 @@ function App() {
         <p>Paste an HLS manifest URL to inspect and play the stream</p>
       </header>
 
-      <UrlForm onSubmit={handleSubmit} loading={loading} initialUrl={initialUrl} onImport={handleImport} />
+      <UrlForm onSubmit={handleSubmit} loading={loading} initialUrl={initialUrl} onImport={handleImport} onImportZip={handleImportZip} />
 
       {manifest && masterUrl && (
         <div className="master-url-bar text-dim">
@@ -444,6 +551,7 @@ function App() {
               ref={videoRef}
               hasSource={!snapshotMode && !!activeUrl}
               offlineMessage={snapshotMode ? 'Offline snapshot — playback not available' : undefined}
+              isLive={isLive}
             />
 
             {manifest.isMaster && manifest.variants.length > 0 && (
@@ -640,6 +748,15 @@ function App() {
             )}
 
             <CollapsiblePanel title="Raw Manifest" defaultOpen={false}>
+              {details && details !== manifest && (
+                <>
+                  <div className="raw-manifest__label">Media Playlist</div>
+                  <div className="raw-manifest">
+                    <pre>{details.raw}</pre>
+                  </div>
+                  <div className="raw-manifest__label" style={{ marginTop: 12 }}>Master Playlist</div>
+                </>
+              )}
               <div className="raw-manifest">
                 <pre>{manifest.raw}</pre>
               </div>

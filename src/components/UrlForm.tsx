@@ -5,9 +5,10 @@ interface Props {
   loading: boolean;
   initialUrl?: string;
   onImport: (file: File) => void;
+  onImportZip?: (file: File) => void;
 }
 
-export function UrlForm({ onSubmit, loading, initialUrl, onImport }: Props) {
+export function UrlForm({ onSubmit, loading, initialUrl, onImport, onImportZip }: Props) {
   const [value, setValue] = useState(initialUrl ?? '');
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -49,11 +50,17 @@ export function UrlForm({ onSubmit, loading, initialUrl, onImport }: Props) {
       <input
         ref={fileRef}
         type="file"
-        accept="application/json,.json"
+        accept="application/json,.json,.zip,application/zip"
         style={{ display: 'none' }}
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) onImport(file);
+          if (file) {
+            if (file.name.endsWith('.zip') || file.type === 'application/zip') {
+              onImportZip?.(file);
+            } else {
+              onImport(file);
+            }
+          }
           e.target.value = '';
         }}
       />
