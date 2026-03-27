@@ -55,8 +55,20 @@ export function SubManifests({ variants, audioGroups, subtitleGroups, cache }: P
             <div className="sub-manifest-entry__header">
               <div className="sub-manifest-entry__info">
                 <span className="sub-manifest-entry__label">{entry.label}</span>
-                <span className="sub-manifest-entry__uri truncate" title={entry.uri}>
-                  {fileName(entry.uri)}
+                <span className="sub-manifest-entry__url-row">
+                  <span className="sub-manifest-entry__uri truncate" title={entry.uri}>
+                    {entry.uri}
+                  </span>
+                  <button
+                    className="icon-btn icon-btn--sm"
+                    onClick={() => navigator.clipboard.writeText(entry.uri)}
+                    title="Copy URL"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                    </svg>
+                  </button>
                 </span>
               </div>
               {text ? (
@@ -83,12 +95,4 @@ function formatBandwidth(bps: number): string {
   if (bps >= 1_000_000) return `${(bps / 1_000_000).toFixed(1)} Mbps`;
   if (bps >= 1_000) return `${Math.round(bps / 1_000)} Kbps`;
   return `${bps} bps`;
-}
-
-function fileName(uri: string): string {
-  try {
-    return new URL(uri).pathname.split('/').pop() || uri;
-  } catch {
-    return uri.split('/').pop() || uri;
-  }
 }

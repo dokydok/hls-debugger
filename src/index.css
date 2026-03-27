@@ -213,6 +213,13 @@ body {
   flex-shrink: 0;
 }
 
+.icon-btn--sm {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+}
+
 .icon-btn:hover,
 .url-form__icon-btn:hover {
   color: var(--text);
@@ -520,6 +527,23 @@ body {
   margin: 0;
 }
 
+/* ── Master URL bar ────────────────────────────────────────── */
+
+.master-url-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  padding: 6px 0;
+}
+
+.master-url-bar > .truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
 /* ── Error message ─────────────────────────────────────────── */
 
 .error-message {
@@ -753,6 +777,13 @@ body {
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--text-bright);
+}
+
+.sub-manifest-entry__url-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
 }
 
 .sub-manifest-entry__uri {
