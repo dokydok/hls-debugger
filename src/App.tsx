@@ -15,6 +15,7 @@ import { LowLatencyPanel } from './components/LowLatencyPanel';
 import { IFrameList } from './components/IFrameList';
 import { SubManifests } from './components/SubManifests';
 import { RecordingControls } from './components/RecordingControls';
+import { StreamEnginePlayer } from './components/StreamEnginePlayer';
 import { parseManifest } from './lib/parseManifest';
 import { validateManifest } from './lib/validateManifest';
 import { buildSnapshot, parseSnapshot, downloadSnapshot } from './lib/snapshot';
@@ -553,6 +554,12 @@ function App() {
               offlineMessage={snapshotMode ? 'Offline snapshot — playback not available' : undefined}
               isLive={isLive}
             />
+
+            {!snapshotMode && !localRecording && masterUrl && !masterUrl.startsWith('blob:') && (
+              <CollapsiblePanel title="Stream Engine Player" defaultOpen={false}>
+                <StreamEnginePlayer src={masterUrl} />
+              </CollapsiblePanel>
+            )}
 
             {manifest.isMaster && manifest.variants.length > 0 && (
               <CollapsiblePanel

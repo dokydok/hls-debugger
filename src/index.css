@@ -437,6 +437,14 @@ body {
 
 /* ── Track lists (audio / captions) ────────────────────────── */
 
+.stream-engine-player-wrapper {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+
 .track-list {
   display: flex;
   flex-direction: column;
