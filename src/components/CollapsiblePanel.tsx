@@ -17,9 +17,9 @@ export function CollapsiblePanel({ title, defaultOpen = true, count, children }:
           {title}
           {count != null && <span className="panel__count"> ({count})</span>}
         </span>
-        <span className={`panel__toggle ${open ? 'panel__toggle--open' : ''}`}>
-          ▾
-        </span>
+        <svg className={`panel__toggle ${open ? 'panel__toggle--open' : ''}`} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
       </div>
       {open && <div className="panel__body">{children}</div>}
     </div>

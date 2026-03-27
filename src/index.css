@@ -123,9 +123,9 @@ body {
 }
 
 .panel__toggle {
-  font-size: 0.75rem;
   color: var(--text-dim);
   transition: transform 0.2s;
+  flex-shrink: 0;
 }
 
 .panel__toggle--open {
@@ -663,6 +663,8 @@ body {
 }
 
 .master-url-bar > .truncate {
+  flex: 1;
+  max-width: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

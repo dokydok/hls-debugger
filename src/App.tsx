@@ -321,9 +321,14 @@ function App() {
         setMasterUrl(inputUrl);
         setActiveUrl(inputUrl);
 
+        const currentUrlParam = new URLSearchParams(window.location.search).get('url');
         const params = new URLSearchParams(window.location.search);
         params.set('url', inputUrl);
-        window.history.replaceState(null, '', `?${params}`);
+        if (currentUrlParam === inputUrl) {
+          window.history.replaceState(null, '', `?${params}`);
+        } else {
+          window.history.pushState(null, '', `?${params}`);
+        }
       } catch (err: unknown) {
         if (err instanceof TypeError) {
           setError(
@@ -343,6 +348,10 @@ function App() {
 
   useEffect(() => {
     if (initialUrl) handleSubmit(initialUrl);
+
+    const onPopState = () => window.location.reload();
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePlayVariant = useCallback((url: string) => {
@@ -484,7 +493,7 @@ function App() {
     <div className="app">
       <header className="app__header">
         <div className="app__header-row">
-          <h1>HLS Stream Debugger</h1>
+          <h1>HLS Debugger</h1>
           <div className="app__header-actions">
             {snapshotMode && (
               <span className="badge badge--snapshot">Offline Snapshot</span>
@@ -515,7 +524,6 @@ function App() {
             )}
           </div>
         </div>
-        <p>Paste an HLS manifest URL to inspect and play the stream</p>
       </header>
 
       <UrlForm onSubmit={handleSubmit} loading={loading} initialUrl={initialUrl} onImport={handleImport} onImportZip={handleImportZip} />
