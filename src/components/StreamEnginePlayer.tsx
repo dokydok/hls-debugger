@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import 'stream-engine-player';
 // @ts-expect-error — CSS import has no type declarations
 import 'stream-engine-player/style';
@@ -13,63 +13,67 @@ declare global {
   }
 }
 
-function generateId() {
-  return 'se-' + Math.random().toString(36).slice(2, 10);
-}
+let idCounter = 0;
 
-export function StreamEnginePlayer({ src }: Props) {
-  const [playerKey, setPlayerKey] = useState(() => generateId());
-
-  useEffect(() => {
-    setPlayerKey(generateId());
-  }, [src]);
-
-  return <PlayerInstance key={playerKey} id={playerKey} src={src} />;
-}
-
-function PlayerInstance({ id, src }: { id: string; src: string }) {
-  const playerRef = useRef<{ dispose: () => void } | null>(null);
-  const mountedRef = useRef(true);
+export function StreamEnginePlayerPanel({ src }: Props) {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const activeSrcRef = useRef<string | null>(null);
 
   useEffect(() => {
-    mountedRef.current = true;
+    if (!open || !src) return;
+    // Already initialized for this src
+    if (activeSrcRef.current === src) return;
 
-    // Defer init to next tick so React strict mode's
-    // unmount+remount cycle settles before we create the player
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+
+    // Nuke old player DOM (no dispose — avoids trackLive bug)
+    wrapper.innerHTML = '';
+    activeSrcRef.current = null;
+
+    const id = `se-player-${++idCounter}`;
+    const container = document.createElement('div');
+    container.id = id;
+    container.style.width = '100%';
+    container.style.height = '100%';
+    wrapper.appendChild(container);
+
     const timer = setTimeout(() => {
-      if (!mountedRef.current || !src) return;
-      const el = document.getElementById(id);
-      if (!el) return;
-
+      // Verify container is still in the DOM
+      if (!document.getElementById(id)) return;
       try {
-        playerRef.current = window.streamEnginePlayer(id, {
+        window.streamEnginePlayer(id, {
           src,
           controls: true,
           autoplay: false,
         });
+        activeSrcRef.current = src;
       } catch {
-        // ignore init errors
+        // ignore
       }
-    }, 50);
+    }, 100);
 
-    return () => {
-      mountedRef.current = false;
-      clearTimeout(timer);
-      // Defer dispose to let the DOM settle
-      const player = playerRef.current;
-      if (player) {
-        playerRef.current = null;
-        setTimeout(() => {
-          try { player.dispose(); } catch { /* ignore */ }
-        }, 0);
-      }
-    };
-  }, [id, src]);
+    return () => clearTimeout(timer);
+  }, [open, src]);
 
   return (
-    <div
-      id={id}
-      className="stream-engine-player-wrapper"
-    />
+    <div className="panel">
+      <div className="panel__header" onClick={() => setOpen(!open)}>
+        <span className="panel__title">Stream Engine Player</span>
+        <span className={`panel__toggle ${open ? 'panel__toggle--open' : ''}`}>
+          ▾
+        </span>
+      </div>
+      <div
+        className="panel__body"
+        style={{ display: open ? 'block' : 'none' }}
+      >
+        <div
+          ref={wrapperRef}
+          className="stream-engine-player-wrapper"
+        />
+      </div>
+    </div>
   );
 }
