@@ -7,14 +7,10 @@ Each feature can be planned and implemented independently.
 
 ## High-Value Debugging Features
 
-### 1. Network Waterfall / Segment Timeline `[not implemented]`
-Visual timeline showing when each segment was fetched, its download duration, and size. Similar to Chrome DevTools' network tab but HLS-aware — segments displayed on a horizontal timeline, color-coded by status (success, slow, failed, cached). Hovering shows details (URL, response time, content-type, size).
+### 1. Network Waterfall / Segment Timeline `[implemented]`
+Visual waterfall showing each segment's load timing: TTFB (gray bar) and download (blue bar) on a shared timeline. Each row shows segment number, level, and size. Hover for detailed stats (duration, TTFB, speed). Aborted fragments shown in red. Summary footer with total fragments, bytes, and average load time.
 
-**Use case:** Diagnosing buffering, CDN latency spikes, and bandwidth bottlenecks. Answers "why did the player stall at 2:30?"
-
-**Approach:** Hook into hls.js fragment loading events (`FRAG_LOADING`, `FRAG_LOADED`, `FRAG_LOAD_EMERGENCY_ABORTED`) to collect timing data. Render as a horizontal bar chart using CSS or a lightweight canvas library.
-
-**Complexity:** Medium — requires hls.js event integration and a new visualization component.
+**Implementation:** `src/components/NetworkWaterfall.tsx`. Hooks into hls.js `FRAG_BUFFERED` event in `src/App.tsx` to collect `LoadStats` timing data per fragment. Panel appears after playback starts (not in snapshot mode). CSS-based bars, no external chart library.
 
 ---
 

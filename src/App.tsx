@@ -18,6 +18,8 @@ import { RecordingControls } from './components/RecordingControls';
 import { StreamEnginePlayerPanel } from './components/StreamEnginePlayer';
 import { BitrateLadder } from './components/BitrateLadder';
 import { AdBreakAnalyzer } from './components/AdBreakAnalyzer';
+import { NetworkWaterfall } from './components/NetworkWaterfall';
+import type { FragLoadEntry } from './components/NetworkWaterfall';
 import { ManifestDiff, computeDiff } from './components/ManifestDiff';
 import type { DiffEntry } from './components/ManifestDiff';
 import { parseManifest } from './lib/parseManifest';
@@ -48,6 +50,7 @@ function App() {
   const recordingCleanupRef = useRef<(() => void) | null>(null);
   const [manifestDiffHistory, setManifestDiffHistory] = useState<DiffEntry[]>([]);
   const prevManifestRawRef = useRef<string | null>(null);
+  const [fragLoadEntries, setFragLoadEntries] = useState<FragLoadEntry[]>([]);
 
   const [hlsAudioTracks, setHlsAudioTracks] = useState<RuntimeTrack[]>([]);
   const [hlsSubtitleTracks, setHlsSubtitleTracks] = useState<RuntimeTrack[]>([]);
@@ -122,6 +125,23 @@ function App() {
             setError(`Playback error: ${data.details}`);
           }
         }
+      });
+
+      hls.on(Hls.Events.FRAG_BUFFERED, (_, data) => {
+        const { frag, stats } = data;
+        const entry: FragLoadEntry = {
+          sn: frag.sn,
+          level: frag.level,
+          url: frag.url,
+          duration: frag.duration,
+          loadStartTime: stats.loading.start,
+          firstByteTime: stats.loading.first,
+          loadEndTime: stats.loading.end,
+          bytes: stats.loaded,
+          totalBytes: stats.total,
+          aborted: stats.aborted,
+        };
+        setFragLoadEntries(prev => [...prev, entry]);
       });
 
       hls.loadSource(activeUrl);
@@ -322,6 +342,7 @@ function App() {
       setSubManifestCache({});
       setManifestDiffHistory([]);
       prevManifestRawRef.current = null;
+      setFragLoadEntries([]);
       recordingCleanupRef.current?.();
       recordingCleanupRef.current = null;
       destroyPlayer();
@@ -609,6 +630,12 @@ function App() {
             {allIssues.length > 0 && (
               <CollapsiblePanel title="Issues" count={allIssues.length}>
                 <ManifestIssues issues={allIssues} />
+              </CollapsiblePanel>
+            )}
+
+            {!snapshotMode && fragLoadEntries.length > 0 && (
+              <CollapsiblePanel title="Network Waterfall" count={fragLoadEntries.length} defaultOpen={false}>
+                <NetworkWaterfall entries={fragLoadEntries} />
               </CollapsiblePanel>
             )}
 
