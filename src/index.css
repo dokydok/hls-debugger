@@ -711,6 +711,71 @@ body {
 
 /* ── Master URL bar ────────────────────────────────────────── */
 
+/* ── Stream Health Monitor ────────────────────────────────── */
+
+.health-monitor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.health-metric {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.health-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.health-metric__name {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  width: 110px;
+  flex-shrink: 0;
+}
+
+.health-metric__value {
+  font-size: 0.85rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-bright);
+  width: 65px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.health-metric__unit {
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: var(--text-dim);
+  margin-left: 3px;
+}
+
+.health-sparkline {
+  flex: 1;
+  height: 24px;
+  min-width: 60px;
+}
+
+.health-monitor__overall {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.health-monitor__overall-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
 /* ── Network Waterfall ────────────────────────────────────── */
 
 .waterfall {

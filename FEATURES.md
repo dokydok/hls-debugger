@@ -54,21 +54,16 @@ Click any segment in the segment list to fetch and inspect its binary contents:
 
 ---
 
-### 5. Stream Health Monitor `[not implemented]`
-Real-time dashboard for live streams with key metrics:
-- Manifest poll latency (ms per fetch, trend graph)
-- Segment download throughput (Mbps)
-- Playlist staleness (time since a new segment appeared)
-- Discontinuity rate (discontinuities per minute)
-- Key rotation frequency
-- Buffer health (if hls.js exposes it)
-- Alert indicators: red when manifest stops updating, when segments exceed target duration, when download speed drops below required bitrate
+### 5. Stream Health Monitor `[implemented]`
+Real-time sparkline dashboard for live streams with 4 metrics:
+- **Poll Latency** (ms) — manifest fetch time, yellow >500ms, red >2s
+- **Download Speed** (Mbps) — per-fragment throughput, yellow <1Mbps, red <500Kbps
+- **Staleness** (s) — time since last new segment, yellow >2x target duration, red >4x
+- **Buffer Health** (s) — seconds buffered ahead of playback, yellow <3s, red <1s
 
-**Use case:** Monitoring a live stream over time to catch degradation. Leave it running and glance at the dashboard. Like a mini-Grafana for a single HLS stream.
+Each metric shows current value, color-coded status dot, and SVG sparkline (last 60 samples). Overall status indicator at bottom.
 
-**Approach:** Collect metrics from the existing live polling loop and hls.js events. Store time-series data in state. Render as sparkline graphs or simple number-with-trend indicators.
-
-**Complexity:** Medium-high — needs time-series collection, multiple metric sources, and a dashboard layout.
+**Implementation:** `src/lib/healthMetrics.ts` for time-series data structure, `src/components/StreamHealthMonitor.tsx` for sparkline UI. Data collected from manifest poll timing, hls.js `FRAG_BUFFERED` events, media sequence tracking, and `video.buffered` API (1s interval).
 
 ---
 

@@ -20,6 +20,9 @@ import { BitrateLadder } from './components/BitrateLadder';
 import { AdBreakAnalyzer } from './components/AdBreakAnalyzer';
 import { NetworkWaterfall } from './components/NetworkWaterfall';
 import type { FragLoadEntry } from './components/NetworkWaterfall';
+import { StreamHealthMonitor } from './components/StreamHealthMonitor';
+import { createStreamHealth, addSample, computeOverallStatus } from './lib/healthMetrics';
+import type { StreamHealth } from './lib/healthMetrics';
 import { ManifestDiff, computeDiff } from './components/ManifestDiff';
 import type { DiffEntry } from './components/ManifestDiff';
 import { parseManifest } from './lib/parseManifest';
@@ -51,6 +54,9 @@ function App() {
   const [manifestDiffHistory, setManifestDiffHistory] = useState<DiffEntry[]>([]);
   const prevManifestRawRef = useRef<string | null>(null);
   const [fragLoadEntries, setFragLoadEntries] = useState<FragLoadEntry[]>([]);
+  const [streamHealth, setStreamHealth] = useState<StreamHealth>(createStreamHealth);
+  const lastMediaSeqRef = useRef<number | null>(null);
+  const lastNewSegTimeRef = useRef<number>(Date.now());
 
   const [hlsAudioTracks, setHlsAudioTracks] = useState<RuntimeTrack[]>([]);
   const [hlsSubtitleTracks, setHlsSubtitleTracks] = useState<RuntimeTrack[]>([]);
@@ -142,6 +148,18 @@ function App() {
           aborted: stats.aborted,
         };
         setFragLoadEntries(prev => [...prev, entry]);
+
+        // Update download speed health metric
+        const loadDuration = stats.loading.end - stats.loading.start;
+        if (loadDuration > 0) {
+          const speedMbps = (stats.loaded * 8) / (loadDuration / 1000) / 1_000_000;
+          setStreamHealth(prev => {
+            const h = { ...prev };
+            h.downloadSpeed = addSample(h.downloadSpeed, speedMbps, { warningBelow: 1, criticalBelow: 0.5 });
+            h.overallStatus = computeOverallStatus(h);
+            return h;
+          });
+        }
       });
 
       hls.loadSource(activeUrl);
@@ -200,6 +218,26 @@ function App() {
     };
   }, [activeUrl, destroyPlayer, snapshotMode]);
 
+  // Buffer health tracking (1s interval)
+  useEffect(() => {
+    if (snapshotMode || !activeUrl) return;
+    const timer = setInterval(() => {
+      const video = videoRef.current;
+      if (!video || video.paused) return;
+      const buffered = video.buffered;
+      if (buffered.length === 0) return;
+      const bufferEnd = buffered.end(buffered.length - 1);
+      const ahead = Math.max(0, bufferEnd - video.currentTime);
+      setStreamHealth(prev => {
+        const h = { ...prev };
+        h.bufferHealth = addSample(h.bufferHealth, ahead, { warningBelow: 3, criticalBelow: 1 });
+        h.overallStatus = computeOverallStatus(h);
+        return h;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [snapshotMode, activeUrl]);
+
   useEffect(() => {
     if (snapshotMode) return;
     if (!manifest?.isMaster) {
@@ -222,13 +260,35 @@ function App() {
 
     const fetchMediaManifest = async () => {
       try {
+        const pollStart = performance.now();
         const res = await fetch(variantUrl, { mode: 'cors', cache: 'no-store' });
         if (!res.ok || cancelled) return;
         const text = await res.text();
+        const pollMs = performance.now() - pollStart;
         if (cancelled) return;
         const parsed = parseManifest(text, variantUrl);
         parsed.issues = validateManifest(parsed);
         setMediaManifest(parsed);
+
+        // Update health metrics for live streams
+        if (parsed.liveStream?.isLive) {
+          const td = parsed.targetDuration ?? 6;
+          setStreamHealth(prev => {
+            let h = { ...prev };
+            h.pollLatency = addSample(h.pollLatency, pollMs, { warningAbove: 500, criticalAbove: 2000 });
+
+            const seq = parsed.mediaSequence ?? 0;
+            if (lastMediaSeqRef.current !== null && seq !== lastMediaSeqRef.current) {
+              lastNewSegTimeRef.current = Date.now();
+            }
+            lastMediaSeqRef.current = seq;
+            const staleSeconds = (Date.now() - lastNewSegTimeRef.current) / 1000;
+            h.staleness = addSample(h.staleness, staleSeconds, { warningAbove: td * 2, criticalAbove: td * 4 });
+
+            h.overallStatus = computeOverallStatus(h);
+            return h;
+          });
+        }
 
         // Compute manifest diff for live streams
         if (prevManifestRawRef.current !== null && prevManifestRawRef.current !== text) {
@@ -343,6 +403,9 @@ function App() {
       setManifestDiffHistory([]);
       prevManifestRawRef.current = null;
       setFragLoadEntries([]);
+      setStreamHealth(createStreamHealth());
+      lastMediaSeqRef.current = null;
+      lastNewSegTimeRef.current = Date.now();
       recordingCleanupRef.current?.();
       recordingCleanupRef.current = null;
       destroyPlayer();
@@ -630,6 +693,12 @@ function App() {
             {allIssues.length > 0 && (
               <CollapsiblePanel title="Issues" count={allIssues.length}>
                 <ManifestIssues issues={allIssues} />
+              </CollapsiblePanel>
+            )}
+
+            {isLive && !snapshotMode && streamHealth.pollLatency.samples.length > 0 && (
+              <CollapsiblePanel title="Stream Health" defaultOpen={false}>
+                <StreamHealthMonitor health={streamHealth} />
               </CollapsiblePanel>
             )}
 
