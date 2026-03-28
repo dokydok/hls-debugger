@@ -260,3 +260,12 @@ These four features give the most debugging value with reasonable implementation
 2. **Bitrate Ladder Visualization** (#2) `[implemented]` — visual, helps catch common encoding issues fast
 3. **Manifest Diff for Live** (#3) `[implemented]` — leverages existing live polling, very useful for live debugging
 4. **SCTE-35 Analyzer** (#9) — ad insertion is one of the most common debugging scenarios
+
+---
+
+## Infrastructure
+
+### PWA Support `[implemented]`
+Installable as a standalone app on mobile (iOS/Android) and desktop via "Add to Home Screen". Includes web app manifest, service worker with precaching, and app icons (192px + 512px PNG + SVG).
+
+**Implementation:** `vite-plugin-pwa` in `vite.config.ts`, icons in `public/`, Apple mobile web app meta tags in `index.html`.
