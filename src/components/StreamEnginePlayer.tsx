@@ -47,6 +47,20 @@ export function StreamEnginePlayerPanel({ src }: Props) {
           src,
           controls: true,
           autoplay: false,
+          style : {
+            controls_background     : '#00000099',
+            controls_mobile_background: '#000000AA',
+            progress_bar            : '#ff0036',
+            progress_bar_background : '#ffffff33',
+            progress_bar_loaded     : '#ffffff66',
+            thumb                   : '#ff0036',
+            button                  : '#eeeeee',
+            button_hover            : '#ffffff',
+            text                    : '#ffffff',
+            volume_bar              : '#ff0036',
+            volume_bar_background   : '#ffffff33',
+            volume_thumb            : '#ff0036',
+          }
         });
         activeSrcRef.current = src;
       } catch {
