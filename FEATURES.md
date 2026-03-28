@@ -18,35 +18,25 @@ Visual timeline showing when each segment was fetched, its download duration, an
 
 ---
 
-### 2. Bitrate Ladder Visualization `[not implemented]`
-Chart plotting all renditions by resolution (y-axis) vs bitrate (x-axis). Highlights issues like:
-- Large gaps in the ladder (e.g., 2 Mbps jumping to 8 Mbps with nothing between)
-- Duplicate renditions (same resolution, similar bitrate)
-- Codec mismatches across renditions (e.g., some H.264, some HEVC)
-- Missing audio-only rendition for very low bandwidth
+### 2. Bitrate Ladder Visualization `[implemented]`
+SVG scatter chart plotting all renditions by resolution height (y-axis) vs bitrate (x-axis, log scale). Color-coded by video codec. Highlights:
+- Large bitrate gaps (>3x between adjacent renditions) — dashed orange warning lines
+- Near-duplicate renditions (same resolution, bandwidth within 10%) — orange ring
+- Audio-only variants shown at bottom row
+- Legend with codec colors and issue counts
 
-**Use case:** Reviewing encoding configurations, spotting ABR switching problems, comparing bitrate ladders across streams.
-
-**Approach:** Pure data visualization from existing `manifest.variants`. Scatter plot with labeled points. Could use CSS grid or SVG for the chart — no external charting library needed.
-
-**Complexity:** Low-medium — data already exists, just needs visualization.
+**Implementation:** `src/components/BitrateLadder.tsx` — pure SVG, no external charting library. Shown inside the Renditions panel when 2+ variants exist. Uses `parseCodecs` from `src/lib/codecParser.ts` for codec color-coding.
 
 ---
 
-### 3. Manifest Diff (Live Polling) `[not implemented]`
-Side-by-side or inline diff showing what changed between consecutive manifest polls. For live streams:
-- New segments added (highlighted green)
-- Segments that fell off the rolling window (highlighted red)
-- Media sequence number changes
-- Any tag modifications
+### 3. Manifest Diff (Live Polling) `[implemented]`
+Inline diff showing what changed between consecutive manifest polls. For live streams:
+- New lines added (highlighted green with `+` marker)
+- Lines removed / fell off the window (highlighted red with `−` marker)
+- Dropdown to browse last 30 poll diffs with timestamps and change counts
+- Only appears for live streams after the first manifest update
 
-Includes a history of diffs — scroll through the last N polls to trace how the manifest evolved.
-
-**Use case:** Debugging live stream manifest update anomalies — stale manifests, missing segments, unexpected sequence jumps, irregular update intervals.
-
-**Approach:** Store previous manifest text on each poll (already have `mediaManifest.raw`). Compute a simple line-based diff and render inline with add/remove highlighting. Keep a circular buffer of the last ~20 diffs.
-
-**Complexity:** Medium — needs diff logic, history state, and a new panel component.
+**Implementation:** `src/components/ManifestDiff.tsx` with `computeDiff()` for line-based diffing. History stored in App.tsx state (`manifestDiffHistory`), computed on each live poll cycle. Shown in its own collapsible panel in the details column.
 
 ---
 
@@ -267,6 +257,6 @@ Parse `EXT-X-DEFINE` tags and show:
 These four features give the most debugging value with reasonable implementation effort:
 
 1. **Codec String Parser** (#6) `[implemented]` — small scope, high daily value, no new dependencies
-2. **Manifest Diff for Live** (#3) — leverages existing live polling, very useful for live debugging
-3. **Bitrate Ladder Visualization** (#2) — visual, helps catch common encoding issues fast
+2. **Bitrate Ladder Visualization** (#2) `[implemented]` — visual, helps catch common encoding issues fast
+3. **Manifest Diff for Live** (#3) `[implemented]` — leverages existing live polling, very useful for live debugging
 4. **SCTE-35 Analyzer** (#9) — ad insertion is one of the most common debugging scenarios

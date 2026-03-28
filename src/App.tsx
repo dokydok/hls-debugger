@@ -16,6 +16,9 @@ import { IFrameList } from './components/IFrameList';
 import { SubManifests } from './components/SubManifests';
 import { RecordingControls } from './components/RecordingControls';
 import { StreamEnginePlayerPanel } from './components/StreamEnginePlayer';
+import { BitrateLadder } from './components/BitrateLadder';
+import { ManifestDiff, computeDiff } from './components/ManifestDiff';
+import type { DiffEntry } from './components/ManifestDiff';
 import { parseManifest } from './lib/parseManifest';
 import { validateManifest } from './lib/validateManifest';
 import { buildSnapshot, parseSnapshot, downloadSnapshot } from './lib/snapshot';
@@ -42,6 +45,8 @@ function App() {
   const [localRecording, setLocalRecording] = useState(false);
   const [subManifestCache, setSubManifestCache] = useState<Record<string, string>>({});
   const recordingCleanupRef = useRef<(() => void) | null>(null);
+  const [manifestDiffHistory, setManifestDiffHistory] = useState<DiffEntry[]>([]);
+  const prevManifestRawRef = useRef<string | null>(null);
 
   const [hlsAudioTracks, setHlsAudioTracks] = useState<RuntimeTrack[]>([]);
   const [hlsSubtitleTracks, setHlsSubtitleTracks] = useState<RuntimeTrack[]>([]);
@@ -204,6 +209,13 @@ function App() {
         parsed.issues = validateManifest(parsed);
         setMediaManifest(parsed);
 
+        // Compute manifest diff for live streams
+        if (prevManifestRawRef.current !== null && prevManifestRawRef.current !== text) {
+          const diff = computeDiff(prevManifestRawRef.current, text);
+          setManifestDiffHistory(prev => [diff, ...prev].slice(0, 30));
+        }
+        prevManifestRawRef.current = text;
+
         // Update sub-manifest cache with latest text for this variant
         setSubManifestCache(prev => ({ ...prev, [variantUrl]: text }));
 
@@ -307,6 +319,8 @@ function App() {
       setSnapshotMode(false);
       setLocalRecording(false);
       setSubManifestCache({});
+      setManifestDiffHistory([]);
+      prevManifestRawRef.current = null;
       recordingCleanupRef.current?.();
       recordingCleanupRef.current = null;
       destroyPlayer();
@@ -582,6 +596,12 @@ function App() {
                 />
               </CollapsiblePanel>
             )}
+
+            {manifest.isMaster && manifest.variants.length >= 2 && (
+              <CollapsiblePanel title="Bitrate Ladder" defaultOpen={false}>
+                <BitrateLadder variants={manifest.variants} />
+              </CollapsiblePanel>
+            )}
           </div>
 
           <div className="app__details-col">
@@ -757,6 +777,12 @@ function App() {
                   subtitleGroups={manifest.subtitleGroups}
                   cache={subManifestCache}
                 />
+              </CollapsiblePanel>
+            )}
+
+            {isLive && manifestDiffHistory.length > 0 && (
+              <CollapsiblePanel title="Manifest Diff" count={manifestDiffHistory.length} defaultOpen={false}>
+                <ManifestDiff history={manifestDiffHistory} />
               </CollapsiblePanel>
             )}
 
