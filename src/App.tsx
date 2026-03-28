@@ -17,6 +17,7 @@ import { SubManifests } from './components/SubManifests';
 import { RecordingControls } from './components/RecordingControls';
 import { StreamEnginePlayerPanel } from './components/StreamEnginePlayer';
 import { BitrateLadder } from './components/BitrateLadder';
+import { AdBreakAnalyzer } from './components/AdBreakAnalyzer';
 import { ManifestDiff, computeDiff } from './components/ManifestDiff';
 import type { DiffEntry } from './components/ManifestDiff';
 import { parseManifest } from './lib/parseManifest';
@@ -702,6 +703,16 @@ function App() {
                   targetDuration={details.targetDuration}
                   liveStream={details.liveStream}
                 />
+              </CollapsiblePanel>
+            )}
+
+            {(details?.segmentAnalysis?.cueOutCount ?? 0) > 0 && (
+              <CollapsiblePanel
+                title="Ad Breaks (SCTE-35)"
+                count={details!.segmentAnalysis!.cueOutCount}
+                defaultOpen={false}
+              >
+                <AdBreakAnalyzer segments={details!.segments} />
               </CollapsiblePanel>
             )}
 

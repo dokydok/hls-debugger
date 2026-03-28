@@ -116,18 +116,15 @@ Split-pane editor: raw M3U8 text on the left, parsed visualization on the right.
 
 ---
 
-### 9. SCTE-35 Ad Marker Analyzer `[not implemented]`
+### 9. SCTE-35 Ad Marker Analyzer `[implemented]`
 Dedicated panel for ad insertion analysis:
-- Timeline view of all CUE-OUT/CUE-IN pairs with durations
-- Gap detection (CUE-OUT without matching CUE-IN)
-- Duration validation (declared ad break duration vs actual)
-- SCTE-35 binary payload decoding from EXT-X-DATERANGE (if present)
-- Overlap detection (nested or overlapping ad breaks)
-- Summary: total ad time, ad break count, average break duration
+- Summary: total ad time (with playlist percentage), break count, issue badges
+- Timeline bar showing ad break positions relative to playlist duration
+- Break table: start/end times, declared vs actual duration, segment count, paired/unclosed/mismatch status
+- Detects: unpaired CUE-OUTs, orphan CUE-INs, duration mismatches (>10% declared vs actual)
+- Unclosed breaks shown with striped pattern in timeline
 
-**Use case:** Ad insertion is one of the most complex and error-prone parts of HLS. This saves hours of manual manifest reading. Critical for SSAI/CSAI debugging.
-
-**Complexity:** Medium — builds on existing CUE parsing. SCTE-35 binary decoding is optional and adds complexity.
+**Implementation:** `src/lib/analyzeAdBreaks.ts` for analysis logic, `src/components/AdBreakAnalyzer.tsx` for UI. Panel shown when CUE-OUT markers are detected.
 
 ---
 
@@ -259,7 +256,7 @@ These four features give the most debugging value with reasonable implementation
 1. **Codec String Parser** (#6) `[implemented]` — small scope, high daily value, no new dependencies
 2. **Bitrate Ladder Visualization** (#2) `[implemented]` — visual, helps catch common encoding issues fast
 3. **Manifest Diff for Live** (#3) `[implemented]` — leverages existing live polling, very useful for live debugging
-4. **SCTE-35 Analyzer** (#9) — ad insertion is one of the most common debugging scenarios
+4. **SCTE-35 Analyzer** (#9) `[implemented]` — ad insertion is one of the most common debugging scenarios
 
 ---
 

@@ -711,6 +711,66 @@ body {
 
 /* ── Master URL bar ────────────────────────────────────────── */
 
+/* ── Ad Break Analyzer ────────────────────────────────────── */
+
+.ad-break-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.ad-break-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.ad-break-stat__value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-bright);
+  font-family: var(--font-mono);
+}
+
+.ad-break-stat__label {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.ad-break-timeline {
+  position: relative;
+  height: 16px;
+  background: rgba(148, 163, 184, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.ad-break-timeline__region {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: rgba(239, 68, 68, 0.5);
+  border-radius: 2px;
+  cursor: default;
+  transition: background 0.15s;
+}
+
+.ad-break-timeline__region:hover {
+  background: rgba(239, 68, 68, 0.8);
+}
+
+.ad-break-timeline__region--unclosed {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(239, 68, 68, 0.4),
+    rgba(239, 68, 68, 0.4) 3px,
+    rgba(239, 68, 68, 0.2) 3px,
+    rgba(239, 68, 68, 0.2) 6px
+  );
+}
+
 /* ── Manifest Diff ────────────────────────────────────────── */
 
 .manifest-diff__controls {
