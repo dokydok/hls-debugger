@@ -1,4 +1,5 @@
 import type { Variant } from '../lib/types';
+import { parseCodecs, formatCodecs } from '../lib/codecParser';
 
 interface Props {
   variants: Variant[];
@@ -52,8 +53,12 @@ export function RenditionList({
         const res = v.resolution
           ? `${v.resolution.width}\u00d7${v.resolution.height}`
           : 'Audio only';
+        const parsed = parseCodecs(v.codecs);
+        const codecLabel = parsed.length > 0 ? formatCodecs(parsed) : v.codecs;
+        const unsupported = parsed.filter(c => c.supported === false);
+
         const details = [
-          v.codecs,
+          codecLabel,
           v.frameRate ? `${v.frameRate}fps` : null,
           v.averageBandwidth ? `avg: ${formatBandwidth(v.averageBandwidth)}` : null,
           v.audioGroup ? `audio: ${v.audioGroup}` : null,
@@ -78,7 +83,12 @@ export function RenditionList({
                 {res} &mdash; {formatBandwidth(v.bandwidth)}
               </span>
               {details && (
-                <span className="rendition-item__secondary">{details}</span>
+                <span className="rendition-item__secondary" title={v.codecs || undefined}>{details}</span>
+              )}
+              {unsupported.length > 0 && (
+                <span className="rendition-item__unsupported">
+                  {unsupported.map(c => c.name).join(', ')} not supported in this browser
+                </span>
               )}
             </div>
             {isActive && !playbackDisabled ? (

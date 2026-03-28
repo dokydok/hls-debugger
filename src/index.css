@@ -435,6 +435,12 @@ body {
   white-space: nowrap;
 }
 
+.rendition-item__unsupported {
+  font-size: 0.7rem;
+  color: #fca5a5;
+  font-style: italic;
+}
+
 /* ── Track lists (audio / captions) ────────────────────────── */
 
 .stream-engine-player-wrapper {

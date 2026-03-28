@@ -1,4 +1,5 @@
 import type { IFramePlaylistInfo } from '../lib/types';
+import { parseCodecs, formatCodecs } from '../lib/codecParser';
 
 interface Props {
   playlists: IFramePlaylistInfo[];
@@ -23,7 +24,9 @@ export function IFrameList({ playlists }: Props) {
             <tr key={i}>
               <td>{p.resolution ? `${p.resolution.width}×${p.resolution.height}` : '—'}</td>
               <td>{formatBandwidth(p.bandwidth)}</td>
-              <td>{p.codecs || '—'}</td>
+              <td title={p.codecs || undefined}>
+                {p.codecs ? formatCodecs(parseCodecs(p.codecs)) : '—'}
+              </td>
               <td className="truncate" title={p.uri}>{fileName(p.uri)}</td>
             </tr>
           ))}
