@@ -178,7 +178,8 @@ export function rewriteVariant(text: string, srcUrl: string, mode: Mode): string
     throw new Error('Variant manifest has no segments');
   }
 
-  const pool = segments;
+  const medianDur = median(segments.map((s) => s.durationSec));
+  const pool = segments.filter((s) => s.durationSec >= medianDur * 0.8);
 
   const segDur = Math.max(1, Math.round(median(pool.map((s) => s.durationSec)))) || 4;
   const tick = Math.floor(Date.now() / 1000 / segDur);
