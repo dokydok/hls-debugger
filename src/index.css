@@ -195,6 +195,60 @@ body {
   cursor: not-allowed;
 }
 
+.url-form__fake-live {
+  position: relative;
+}
+
+.url-form__fake-live-pop {
+  position: fixed;
+  z-index: 9999;
+  min-width: 220px;
+  background: var(--bg-secondary, #1a1a1f);
+  border: 1px solid var(--border, #333);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.url-form__fake-live-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+  margin-bottom: 2px;
+}
+
+.url-form__fake-live-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.url-form__fake-live-row input {
+  cursor: pointer;
+}
+
+.url-form__fake-live-apply {
+  margin-top: 4px;
+  background: linear-gradient(135deg, var(--accent-from), var(--accent-to));
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.url-form__fake-live-apply:hover {
+  opacity: 0.9;
+}
+
 /* ── Icon Buttons & Snapshot ──────────────────────────────── */
 
 .icon-btn,
@@ -221,10 +275,15 @@ body {
 }
 
 .icon-btn:hover,
-.url-form__icon-btn:hover {
+.url-form__icon-btn:hover:not(:disabled) {
   color: var(--text);
   border-color: var(--accent);
   background: rgba(99, 102, 241, 0.08);
+}
+
+.url-form__icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .app__header-row {

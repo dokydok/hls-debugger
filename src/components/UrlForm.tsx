@@ -1,21 +1,71 @@
-import { useState, useRef, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { createPortal } from 'react-dom';
+
+type FakeLiveMode = 'rolling' | 'event';
 
 interface Props {
+  value: string;
+  onChange: (url: string) => void;
   onSubmit: (url: string) => void;
   loading: boolean;
-  initialUrl?: string;
   onImport: (file: File) => void;
   onImportZip?: (file: File) => void;
 }
 
-export function UrlForm({ onSubmit, loading, initialUrl, onImport, onImportZip }: Props) {
-  const [value, setValue] = useState(initialUrl ?? '');
+export function UrlForm({ value, onChange, onSubmit, loading, onImport, onImportZip }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const fakeLiveBtnRef = useRef<HTMLButtonElement>(null);
+  const [mode, setMode] = useState<FakeLiveMode>('rolling');
+  const [fakeLiveOpen, setFakeLiveOpen] = useState(false);
+  const [popPos, setPopPos] = useState<{ top: number; right: number } | null>(null);
+
+  useEffect(() => {
+    if (!fakeLiveOpen) return;
+    function reposition() {
+      const r = fakeLiveBtnRef.current?.getBoundingClientRect();
+      if (r) setPopPos({ top: r.bottom + 6, right: window.innerWidth - r.right });
+    }
+    reposition();
+    function onDocClick(e: MouseEvent) {
+      const tgt = e.target as Node;
+      if (popoverRef.current?.contains(tgt)) return;
+      if (fakeLiveBtnRef.current?.contains(tgt)) return;
+      setFakeLiveOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      window.removeEventListener('resize', reposition);
+      window.removeEventListener('scroll', reposition, true);
+    };
+  }, [fakeLiveOpen]);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const trimmed = value.trim();
     if (trimmed) onSubmit(trimmed);
+  }
+
+  const isAlreadyFakeLive = /\/api\/fake-live\//.test(value);
+
+  function handleMakeFakeLive(selectedMode: FakeLiveMode) {
+    const trimmed = value.trim();
+    if (!trimmed || isAlreadyFakeLive) return;
+    const origin = window.location.origin;
+    const fakeUrl = `${origin}/api/fake-live/master.m3u8?src=${encodeURIComponent(trimmed)}&mode=${selectedMode}`;
+    onChange(fakeUrl);
+    setFakeLiveOpen(false);
+  }
+
+  function handleUnwrap() {
+    try {
+      const u = new URL(value);
+      const src = u.searchParams.get('src');
+      if (src) onChange(src);
+    } catch { /* ignore */ }
   }
 
   return (
@@ -24,7 +74,7 @@ export function UrlForm({ onSubmit, loading, initialUrl, onImport, onImportZip }
         className="url-form__input"
         type="url"
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => onChange(e.target.value)}
         placeholder="Paste HLS stream URL (.m3u8)"
         disabled={loading}
       />
@@ -33,7 +83,7 @@ export function UrlForm({ onSubmit, loading, initialUrl, onImport, onImportZip }
         type="submit"
         disabled={loading || !value.trim()}
       >
-        {loading ? 'Loading\u2026' : 'Load Stream'}
+        {loading ? 'Loading…' : 'Load Stream'}
       </button>
       <button
         type="button"
@@ -47,6 +97,63 @@ export function UrlForm({ onSubmit, loading, initialUrl, onImport, onImportZip }
           <line x1="12" y1="15" x2="12" y2="3" />
         </svg>
       </button>
+      <div className="url-form__fake-live">
+        {isAlreadyFakeLive ? (
+          <button
+            type="button"
+            className="url-form__icon-btn"
+            title="Restore original URL (unwrap fake-live)"
+            onClick={handleUnwrap}
+            disabled={loading}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 14 4 9 9 4" />
+              <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+            </svg>
+          </button>
+        ) : (
+          <button
+            ref={fakeLiveBtnRef}
+            type="button"
+            className="url-form__icon-btn"
+            title="Wrap this URL as a fake live stream"
+            onClick={() => setFakeLiveOpen((o) => !o)}
+            disabled={loading || !value.trim()}
+            aria-expanded={fakeLiveOpen}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 12a10 10 0 0 1 20 0" />
+              <path d="M5.5 12a6.5 6.5 0 0 1 13 0" />
+              <circle cx="12" cy="12" r="2" />
+            </svg>
+          </button>
+        )}
+        {fakeLiveOpen && popPos && createPortal(
+          <div
+            ref={popoverRef}
+            className="url-form__fake-live-pop"
+            style={{ top: popPos.top, right: popPos.right }}
+          >
+            <div className="url-form__fake-live-title">Fake live</div>
+            <label className="url-form__fake-live-row">
+              <input type="radio" name="fake-live-mode" value="rolling" checked={mode === 'rolling'} onChange={() => setMode('rolling')} />
+              <span>Rolling (4-chunk window)</span>
+            </label>
+            <label className="url-form__fake-live-row">
+              <input type="radio" name="fake-live-mode" value="event" checked={mode === 'event'} onChange={() => setMode('event')} />
+              <span>Event (grows then resets)</span>
+            </label>
+            <button
+              type="button"
+              className="url-form__fake-live-apply"
+              onClick={() => handleMakeFakeLive(mode)}
+            >
+              Apply
+            </button>
+          </div>,
+          document.body,
+        )}
+      </div>
       <input
         ref={fileRef}
         type="file"

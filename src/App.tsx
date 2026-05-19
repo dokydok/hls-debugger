@@ -40,7 +40,8 @@ function getInitialUrl(): string {
 }
 
 function App() {
-  const [initialUrl] = useState(getInitialUrl);
+  const [urlInput, setUrlInput] = useState(getInitialUrl);
+  const initialUrlRef = useRef(urlInput);
   const [manifest, setManifest] = useState<ParsedManifest | null>(null);
   const [masterUrl, setMasterUrl] = useState('');
   const [activeUrl, setActiveUrl] = useState<string | null>(null);
@@ -56,6 +57,7 @@ function App() {
   const [fragLoadEntries, setFragLoadEntries] = useState<FragLoadEntry[]>([]);
   const [streamHealth, setStreamHealth] = useState<StreamHealth>(createStreamHealth);
   const lastMediaSeqRef = useRef<number | null>(null);
+  const lastSegCountRef = useRef<number | null>(null);
   const lastNewSegTimeRef = useRef<number>(Date.now());
 
   const [hlsAudioTracks, setHlsAudioTracks] = useState<RuntimeTrack[]>([]);
@@ -278,10 +280,15 @@ function App() {
             h.pollLatency = addSample(h.pollLatency, pollMs, { warningAbove: 500, criticalAbove: 2000 });
 
             const seq = parsed.mediaSequence ?? 0;
-            if (lastMediaSeqRef.current !== null && seq !== lastMediaSeqRef.current) {
+            const segCount = parsed.segments.length;
+            if (
+              (lastMediaSeqRef.current !== null && seq !== lastMediaSeqRef.current) ||
+              (lastSegCountRef.current !== null && segCount !== lastSegCountRef.current)
+            ) {
               lastNewSegTimeRef.current = Date.now();
             }
             lastMediaSeqRef.current = seq;
+            lastSegCountRef.current = segCount;
             const staleSeconds = (Date.now() - lastNewSegTimeRef.current) / 1000;
             h.staleness = addSample(h.staleness, staleSeconds, { warningAbove: td * 2, criticalAbove: td * 4 });
 
@@ -405,6 +412,7 @@ function App() {
       setFragLoadEntries([]);
       setStreamHealth(createStreamHealth());
       lastMediaSeqRef.current = null;
+      lastSegCountRef.current = null;
       lastNewSegTimeRef.current = Date.now();
       recordingCleanupRef.current?.();
       recordingCleanupRef.current = null;
@@ -412,7 +420,17 @@ function App() {
 
       try {
         const res = await fetch(inputUrl, { mode: 'cors' });
-        if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+        if (!res.ok) {
+          let detail = '';
+          try {
+            const ct = res.headers.get('content-type') ?? '';
+            if (ct.includes('application/json')) {
+              const body = (await res.clone().json()) as { error?: string };
+              if (body?.error) detail = ` — ${body.error}`;
+            }
+          } catch { /* ignore */ }
+          throw new Error(`HTTP ${res.status} ${res.statusText}${detail}`);
+        }
         const text = await res.text();
         const parsed = parseManifest(text, inputUrl);
         parsed.issues = validateManifest(parsed);
@@ -446,7 +464,7 @@ function App() {
   );
 
   useEffect(() => {
-    if (initialUrl) handleSubmit(initialUrl);
+    if (initialUrlRef.current) handleSubmit(initialUrlRef.current);
 
     const onPopState = () => window.location.reload();
     window.addEventListener('popstate', onPopState);
@@ -625,7 +643,7 @@ function App() {
         </div>
       </header>
 
-      <UrlForm onSubmit={handleSubmit} loading={loading} initialUrl={initialUrl} onImport={handleImport} onImportZip={handleImportZip} />
+      <UrlForm value={urlInput} onChange={setUrlInput} onSubmit={handleSubmit} loading={loading} onImport={handleImport} onImportZip={handleImportZip} />
 
       {manifest && masterUrl && (
         <div className="master-url-bar text-dim">
@@ -660,6 +678,7 @@ function App() {
               hasSource={!snapshotMode && !!activeUrl}
               offlineMessage={snapshotMode ? 'Offline snapshot — playback not available' : undefined}
               isLive={isLive}
+              targetDuration={details?.targetDuration}
             />
 
             {!snapshotMode && !localRecording && masterUrl && !masterUrl.startsWith('blob:') && (
