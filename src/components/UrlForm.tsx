@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 
-type FakeLiveMode = 'rolling' | 'event';
+type FakeLiveMode = 'rolling' | 'event' | 'daily';
 
 interface Props {
   value: string;
@@ -142,6 +142,10 @@ export function UrlForm({ value, onChange, onSubmit, loading, onImport, onImport
             <label className="url-form__fake-live-row">
               <input type="radio" name="fake-live-mode" value="event" checked={mode === 'event'} onChange={() => setMode('event')} />
               <span>Event (grows then resets)</span>
+            </label>
+            <label className="url-form__fake-live-row">
+              <input type="radio" name="fake-live-mode" value="daily" checked={mode === 'daily'} onChange={() => setMode('daily')} />
+              <span>Daily (loops chunks, resets at midnight UTC)</span>
             </label>
             <button
               type="button"

@@ -1,6 +1,6 @@
 import { resolveUrl, rewriteUriAttr } from './resolveUrl';
 
-export type Mode = 'rolling' | 'event';
+export type Mode = 'rolling' | 'event' | 'daily';
 
 interface SegmentInfo {
   uri: string;
@@ -137,6 +137,25 @@ interface EventResult {
   cycleStartTick: number;
 }
 
+function computeDaily(pool: SegmentInfo[], segDur: number, nowSec: number): EventResult {
+  const SECS_PER_DAY = 86400;
+  const dayIdx = Math.floor(nowSec / SECS_PER_DAY);
+  const midnightSec = dayIdx * SECS_PER_DAY;
+  const ticksSinceMidnight = Math.floor((nowSec - midnightSec) / segDur);
+  const maxPerDay = Math.floor(SECS_PER_DAY / segDur);
+  const minCount = Math.min(3, pool.length);
+  const emittedCount = Math.min(maxPerDay, minCount + ticksSinceMidnight);
+  const emitted: Emitted[] = [];
+  for (let i = 0; i < emittedCount; i++) {
+    emitted.push({ segment: pool[i % pool.length], windowIndex: i });
+  }
+  return {
+    emitted,
+    mediaSequence: dayIdx * maxPerDay + 1,
+    cycleStartTick: Math.floor(midnightSec / segDur),
+  };
+}
+
 function computeEvent(pool: SegmentInfo[], tick: number): EventResult {
   const cap = pool.length;
   const minCount = Math.min(3, cap);
@@ -164,17 +183,20 @@ export function rewriteVariant(text: string, srcUrl: string, mode: Mode): string
   const segDur = Math.max(1, Math.round(median(pool.map((s) => s.durationSec)))) || 4;
   const tick = Math.floor(Date.now() / 1000 / segDur);
 
-  const eventResult = mode === 'event' ? computeEvent(pool, tick) : null;
-  const { emitted, mediaSequence } = eventResult ?? computeRolling(pool, tick);
+  const nowSec = Math.floor(Date.now() / 1000);
+  let cycleResult: EventResult | null = null;
+  if (mode === 'event') cycleResult = computeEvent(pool, tick);
+  else if (mode === 'daily') cycleResult = computeDaily(pool, segDur, nowSec);
+  const { emitted, mediaSequence } = cycleResult ?? computeRolling(pool, tick);
 
   const out: string[] = ['#EXTM3U'];
   for (const h of headerLines) out.push(h);
   out.push(`#EXT-X-MEDIA-SEQUENCE:${mediaSequence}`);
-  if (mode === 'event') out.push('#EXT-X-PLAYLIST-TYPE:EVENT');
+  if (mode === 'event' || mode === 'daily') out.push('#EXT-X-PLAYLIST-TYPE:EVENT');
 
-  const firstPdtEpoch = eventResult
-    ? eventResult.cycleStartTick * segDur
-    : Math.floor(Date.now() / 1000) - (emitted.length - 1) * segDur;
+  const firstPdtEpoch = cycleResult
+    ? cycleResult.cycleStartTick * segDur
+    : nowSec - (emitted.length - 1) * segDur;
   out.push(`#EXT-X-PROGRAM-DATE-TIME:${new Date(firstPdtEpoch * 1000).toISOString()}`);
 
   let prevMap: string | undefined;

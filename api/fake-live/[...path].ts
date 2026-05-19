@@ -25,7 +25,8 @@ function lastSegment(pathname: string): string {
 }
 
 function parseMode(raw: string | undefined): Mode {
-  return raw === 'event' ? 'event' : 'rolling';
+  if (raw === 'event' || raw === 'daily') return raw;
+  return 'rolling';
 }
 
 async function checkCors(src: string, browserOrigin: string): Promise<{ ok: boolean; reason?: string }> {
