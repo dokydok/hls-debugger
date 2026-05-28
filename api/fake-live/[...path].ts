@@ -12,6 +12,13 @@ function qs(req: VercelReq, key: string): string | undefined {
   return v;
 }
 
+function qsAll(req: VercelReq, key: string): string[] {
+  const v = req.query[key];
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'string') return [v];
+  return [];
+}
+
 function jsonError(res: ServerResponse, status: number, message: string) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json');
@@ -52,8 +59,8 @@ export default async function handler(req: VercelReq, res: ServerResponse): Prom
   const url = new URL(req.url ?? '/', 'http://localhost');
   const filename = lastSegment(url.pathname);
 
-  const src = qs(req, 'src');
-  if (!src) {
+  const srcs = qsAll(req, 'src');
+  if (srcs.length === 0) {
     jsonError(res, 400, 'Missing required query param: src (upstream manifest URL)');
     return;
   }
@@ -64,40 +71,56 @@ export default async function handler(req: VercelReq, res: ServerResponse): Prom
     (req.headers.referer ? new URL(req.headers.referer as string).origin : 'http://localhost:5173');
 
   if (qs(req, 'skipCorsCheck') !== '1') {
-    const corsCheck = await checkCors(src, browserOrigin);
-    if (!corsCheck.ok) {
-      jsonError(res, 400, corsCheck.reason ?? 'CORS check failed');
-      return;
+    for (const src of srcs) {
+      const corsCheck = await checkCors(src, browserOrigin);
+      if (!corsCheck.ok) {
+        jsonError(res, 400, corsCheck.reason ?? 'CORS check failed');
+        return;
+      }
     }
   }
 
   let upstreamText: string;
   try {
-    const r = await fetch(src, { headers: { Origin: browserOrigin } });
+    const r = await fetch(srcs[0], { headers: { Origin: browserOrigin } });
     if (!r.ok) {
-      jsonError(res, 502, `Failed to fetch upstream ${src}: HTTP ${r.status}`);
+      jsonError(res, 502, `Failed to fetch upstream ${srcs[0]}: HTTP ${r.status}`);
       return;
     }
     upstreamText = await r.text();
   } catch (e) {
-    jsonError(res, 502, `Failed to fetch upstream ${src}: ${(e as Error).message}`);
+    jsonError(res, 502, `Failed to fetch upstream ${srcs[0]}: ${(e as Error).message}`);
     return;
   }
 
   res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
 
+  async function fetchAllVariants(): Promise<string[]> {
+    if (srcs.length === 1) return [upstreamText];
+    const rest = await Promise.all(
+      srcs.slice(1).map(async (src) => {
+        const r = await fetch(src, { headers: { Origin: browserOrigin } });
+        if (!r.ok) throw new Error(`Failed to fetch ${src}: HTTP ${r.status}`);
+        return r.text();
+      }),
+    );
+    return [upstreamText, ...rest];
+  }
+
   try {
     if (filename === 'master.m3u8' || filename === '' || filename === 'index.m3u8') {
       if (isMasterManifest(upstreamText)) {
-        res.end(rewriteMaster(upstreamText, src, mode));
+        res.end(rewriteMaster(upstreamText, srcs, mode));
       } else {
-        res.end(rewriteVariant(upstreamText, src, mode));
+        const texts = await fetchAllVariants();
+        res.end(rewriteVariant(texts, srcs, mode));
       }
       return;
     }
 
     if (filename === 'variant.m3u8') {
-      res.end(rewriteVariant(upstreamText, src, mode));
+      const texts = await fetchAllVariants();
+      res.end(rewriteVariant(texts, srcs, mode));
       return;
     }
 

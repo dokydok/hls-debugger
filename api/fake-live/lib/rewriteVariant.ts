@@ -171,8 +171,28 @@ function computeEvent(pool: SegmentInfo[], tick: number): EventResult {
   return { emitted, mediaSequence: cycleNum * cap + 1, cycleStartTick };
 }
 
-export function rewriteVariant(text: string, srcUrl: string, mode: Mode): string {
-  const { headerLines, segments } = parseVariant(text, srcUrl);
+function concatVariants(variants: ParsedVariant[]): ParsedVariant {
+  const headerLines = variants[0].headerLines;
+  const segments: SegmentInfo[] = [];
+  let offset = 0;
+  for (let vi = 0; vi < variants.length; vi++) {
+    const segs = variants[vi].segments;
+    for (let si = 0; si < segs.length; si++) {
+      const seg = segs[si];
+      const prefixLines = [...seg.prefixLines];
+      if (vi > 0 && si === 0 && !prefixLines.some((l) => l.startsWith('#EXT-X-DISCONTINUITY') && !l.startsWith('#EXT-X-DISCONTINUITY-SEQUENCE'))) {
+        prefixLines.unshift('#EXT-X-DISCONTINUITY');
+      }
+      segments.push({ ...seg, prefixLines, sourceIndex: offset + si });
+    }
+    offset += segs.length;
+  }
+  return { headerLines, segments };
+}
+
+export function rewriteVariant(texts: string[], srcUrls: string[], mode: Mode): string {
+  const variants = texts.map((text, i) => parseVariant(text, srcUrls[i] ?? srcUrls[0]));
+  const { headerLines, segments } = concatVariants(variants);
 
   if (segments.length === 0) {
     throw new Error('Variant manifest has no segments');

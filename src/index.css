@@ -202,7 +202,7 @@ body {
 .url-form__fake-live-pop {
   position: fixed;
   z-index: 9999;
-  min-width: 220px;
+  min-width: 360px;
   background: var(--bg-secondary, #1a1a1f);
   border: 1px solid var(--border, #333);
   border-radius: var(--radius-sm);
@@ -232,6 +232,57 @@ body {
 
 .url-form__fake-live-row input {
   cursor: pointer;
+}
+
+.url-form__fake-live-src-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.url-form__fake-live-src-input {
+  flex: 1;
+  background: var(--bg-primary, #111);
+  border: 1px solid var(--border, #333);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary, #e0e0e0);
+  font-size: 0.8rem;
+  padding: 4px 7px;
+  min-width: 0;
+}
+
+.url-form__fake-live-src-input:focus {
+  outline: none;
+  border-color: var(--accent-from, #6366f1);
+}
+
+.url-form__fake-live-src-remove {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #888);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 2px 4px;
+  flex-shrink: 0;
+}
+
+.url-form__fake-live-src-remove:hover {
+  color: var(--text-primary, #e0e0e0);
+}
+
+.url-form__fake-live-add-src {
+  background: none;
+  border: none;
+  color: var(--accent-from, #6366f1);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 2px 0;
+  text-align: left;
+}
+
+.url-form__fake-live-add-src:hover {
+  text-decoration: underline;
 }
 
 .url-form__fake-live-apply {

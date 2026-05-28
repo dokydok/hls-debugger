@@ -53,5 +53,12 @@ export default defineConfig({
       usePolling: true,
       interval: 300,
     },
+    proxy: {
+      '/api': {
+        target: 'https://hls-debugger.videoflow.io',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
   },
 })

@@ -19,6 +19,7 @@ export function UrlForm({ value, onChange, onSubmit, loading, onImport, onImport
   const [mode, setMode] = useState<FakeLiveMode>('rolling');
   const [fakeLiveOpen, setFakeLiveOpen] = useState(false);
   const [popPos, setPopPos] = useState<{ top: number; right: number } | null>(null);
+  const [srcUrls, setSrcUrls] = useState<string[]>(['']);
 
   useEffect(() => {
     if (!fakeLiveOpen) return;
@@ -51,11 +52,18 @@ export function UrlForm({ value, onChange, onSubmit, loading, onImport, onImport
 
   const isAlreadyFakeLive = /\/api\/fake-live\//.test(value);
 
+  function openFakeLivePopover() {
+    setSrcUrls([value.trim() || '']);
+    setFakeLiveOpen((o) => !o);
+  }
+
   function handleMakeFakeLive(selectedMode: FakeLiveMode) {
-    const trimmed = value.trim();
-    if (!trimmed || isAlreadyFakeLive) return;
-    const origin = window.location.origin;
-    const fakeUrl = `${origin}/api/fake-live/master.m3u8?src=${encodeURIComponent(trimmed)}&mode=${selectedMode}`;
+    const validSrcs = srcUrls.map((s) => s.trim()).filter(Boolean);
+    if (validSrcs.length === 0) return;
+    const params = new URLSearchParams();
+    for (const s of validSrcs) params.append('src', s);
+    params.set('mode', selectedMode);
+    const fakeUrl = `${window.location.origin}/api/fake-live/master.m3u8?${params.toString()}`;
     onChange(fakeUrl);
     setFakeLiveOpen(false);
   }
@@ -117,8 +125,8 @@ export function UrlForm({ value, onChange, onSubmit, loading, onImport, onImport
             type="button"
             className="url-form__icon-btn"
             title="Wrap this URL as a fake live stream"
-            onClick={() => setFakeLiveOpen((o) => !o)}
-            disabled={loading || !value.trim()}
+            onClick={openFakeLivePopover}
+            disabled={loading}
             aria-expanded={fakeLiveOpen}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -134,7 +142,32 @@ export function UrlForm({ value, onChange, onSubmit, loading, onImport, onImport
             className="url-form__fake-live-pop"
             style={{ top: popPos.top, right: popPos.right }}
           >
-            <div className="url-form__fake-live-title">Fake live</div>
+            <div className="url-form__fake-live-title">Sources</div>
+            {srcUrls.map((src, i) => (
+              <div key={i} className="url-form__fake-live-src-row">
+                <input
+                  type="text"
+                  className="url-form__fake-live-src-input"
+                  value={src}
+                  onChange={(e) => setSrcUrls((prev) => prev.map((s, idx) => idx === i ? e.target.value : s))}
+                  placeholder="https://cdn.example.com/vod/master.m3u8"
+                />
+                {srcUrls.length > 1 && (
+                  <button
+                    type="button"
+                    className="url-form__fake-live-src-remove"
+                    onClick={() => setSrcUrls((prev) => prev.filter((_, idx) => idx !== i))}
+                    title="Remove source"
+                  >×</button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              className="url-form__fake-live-add-src"
+              onClick={() => setSrcUrls((prev) => [...prev, ''])}
+            >+ Add source</button>
+            <div className="url-form__fake-live-title" style={{ marginTop: 6 }}>Mode</div>
             <label className="url-form__fake-live-row">
               <input type="radio" name="fake-live-mode" value="rolling" checked={mode === 'rolling'} onChange={() => setMode('rolling')} />
               <span>Rolling (4-chunk window)</span>
@@ -150,6 +183,7 @@ export function UrlForm({ value, onChange, onSubmit, loading, onImport, onImport
             <button
               type="button"
               className="url-form__fake-live-apply"
+              disabled={srcUrls.some((s) => !s.trim())}
               onClick={() => handleMakeFakeLive(mode)}
             >
               Apply

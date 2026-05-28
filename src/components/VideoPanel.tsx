@@ -4,12 +4,15 @@ interface Props {
   hasSource: boolean;
   offlineMessage?: string;
   isLive?: boolean;
+  targetDuration?: number;
 }
 
-const LIVE_THRESHOLD = 10;
+const LIVE_SYNC_SEGMENTS = 3; // matches liveSyncDurationCount in hls config
 
 export const VideoPanel = forwardRef<HTMLVideoElement, Props>(
-  function VideoPanel({ hasSource, offlineMessage, isLive }, ref) {
+  function VideoPanel({ hasSource, offlineMessage, isLive, targetDuration }, ref) {
+    // "At live" when within the normal sync distance + 1 segment buffer
+    const liveThreshold = (targetDuration ?? 6) * (LIVE_SYNC_SEGMENTS + 1);
     const [isAtLive, setIsAtLive] = useState(true);
     const [liveEdgeOffset, setLiveEdgeOffset] = useState(0);
 
@@ -32,7 +35,7 @@ export const VideoPanel = forwardRef<HTMLVideoElement, Props>(
         }
         const offset = end - video.currentTime;
         setLiveEdgeOffset(offset);
-        setIsAtLive(offset < LIVE_THRESHOLD);
+        setIsAtLive(offset < liveThreshold);
       };
 
       video.addEventListener('timeupdate', update);

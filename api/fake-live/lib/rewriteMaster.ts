@@ -4,11 +4,12 @@ export function isMasterManifest(text: string): boolean {
   return /^#EXT-X-STREAM-INF/m.test(text);
 }
 
-function buildVariantEndpoint(absUri: string, mode: string): string {
-  return `variant.m3u8?src=${encodeURIComponent(absUri)}&mode=${mode}`;
+function buildVariantEndpoint(absUris: string[], mode: string): string {
+  const params = absUris.map((u) => `src=${encodeURIComponent(u)}`).join('&');
+  return `variant.m3u8?${params}&mode=${mode}`;
 }
 
-export function rewriteMaster(text: string, srcUrl: string, mode: string): string {
+export function rewriteMaster(text: string, srcUrls: string[], mode: string): string {
   const lines = text.split(/\r?\n/);
   const out: string[] = [];
   let prevWasStreamInf = false;
@@ -23,19 +24,20 @@ export function rewriteMaster(text: string, srcUrl: string, mode: string): strin
 
       if (line.startsWith('#EXT-X-I-FRAME-STREAM-INF')) {
         const last = out.pop()!;
-        out.push(last.replace(/URI="([^"]+)"/, (_m, uri) => `URI="${buildVariantEndpoint(resolveUrl(uri, srcUrl), mode)}"`));
+        out.push(last.replace(/URI="([^"]+)"/, (_m, uri) => `URI="${buildVariantEndpoint([resolveUrl(uri, srcUrls[0])], mode)}"`));
       }
       continue;
     }
 
     if (line.startsWith('#EXT-X-MEDIA')) {
-      out.push(line.replace(/URI="([^"]+)"/, (_m, uri) => `URI="${buildVariantEndpoint(resolveUrl(uri, srcUrl), mode)}"`));
+      out.push(line.replace(/URI="([^"]+)"/, (_m, uri) => `URI="${buildVariantEndpoint([resolveUrl(uri, srcUrls[0])], mode)}"`));
       continue;
     }
 
     if (prevWasStreamInf && line.trim() && !line.startsWith('#')) {
-      const abs = resolveUrl(line.trim(), srcUrl);
-      out.push(buildVariantEndpoint(abs, mode));
+      const relUri = line.trim();
+      const absUris = srcUrls.map((base) => resolveUrl(relUri, base));
+      out.push(buildVariantEndpoint(absUris, mode));
       prevWasStreamInf = false;
       continue;
     }
